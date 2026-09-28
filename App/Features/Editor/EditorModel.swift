@@ -188,10 +188,14 @@ final class EditorModel {
     var canRedo: Bool { history.canRedo }
 
     func undo() {
-        if let value = history.undo() { recipe = value }
+        guard let value = history.undo() else { return }
+        recipe = value
+        StyleStore.save(recipe)
     }
 
     func redo() {
-        if let value = history.redo() { recipe = value }
+        guard let value = history.redo() else { return }
+        recipe = value
+        StyleStore.save(recipe)
     }
 }
