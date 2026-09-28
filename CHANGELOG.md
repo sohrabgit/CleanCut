@@ -7,6 +7,7 @@ All notable changes to CleanCut. Versions follow the milestone plan in [docs/SPE
 - A contributor workflow for Claude Code sessions: `CLAUDE.md` (conventions, commands, hard-won gotchas), `/feature` and `/bugfix` project skills, and a PR template.
 
 ### Fixed
+- The Select tool now finds each product separately when U²-Netp does the cutout (always in the Simulator, or when chosen in Settings), so tapping one includes or excludes it. U²-Netp returns one mask for everything in the photo, so two products showed up as a single "Object 1", and tapping it did nothing because the last object can't be excluded. The mask is now split into its disconnected objects. The "Tap objects" hint no longer appears when there is only one object.
 - After choosing a photo from Photos (or taking one with the camera), the editor no longer spreads under the status bar and home indicator, where the Close/Export buttons and the tool tabs couldn't be tapped. The editor was presented while the picker was still animating away, which left it with no safe-area insets; it now waits for that dismissal to finish.
 - Undo/redo now also updates the remembered style used for the next photo and for batch mode.
 

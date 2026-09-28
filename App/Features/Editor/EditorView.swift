@@ -199,14 +199,18 @@ struct EditorView: View {
     private var canvasAccessibilityLabel: String {
         switch model.canvasScene.mode {
         case .original: "Original photo"
-        case .select: "Photo with \(model.instances.count) detected objects. Use the object buttons below to include or exclude them."
+        case .select: model.instances.count > 1
+            ? "Photo with \(model.instances.count) detected objects. Use the object buttons below to include or exclude them."
+            : "Photo with one detected product."
         case .studio: "Studio preview, \(model.recipe.preset.name) format. Pinch to zoom, double-tap to fit."
         }
     }
 
     @ViewBuilder
     private var canvasHints: some View {
-        if model.tool == .select, !hasSeenSelectHint {
+        // With a single object there's nothing to toggle (the last object can't
+        // be excluded), so don't invite a tap that would do nothing.
+        if model.tool == .select, model.instances.count > 1, !hasSeenSelectHint {
             HintCapsule(systemImage: "hand.tap", text: "Tap objects to include or exclude them")
         } else if model.tool != .select, model.subjectTouchesEdge, !dismissedEdgeTip {
             HintCapsule(systemImage: "crop", text: "Tip: leave space around the product for cleaner edges") {

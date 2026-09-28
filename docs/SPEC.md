@@ -17,7 +17,7 @@ OCR fidelity checks, generative backgrounds, manual brush mask editing, accounts
 | Area | Behaviour |
 |---|---|
 | Import | Photos picker (single & multi), camera (device only), bundled sample photos, drag & drop (iPad/Mac) |
-| Segmentation | Vision foreground *instance* mask. Every detected object starts selected; **tap an object to include or exclude it**. A tap on empty background picks the nearest object within a small radius. Where Vision can't run (the Simulator), U²-Netp (Core ML) takes over automatically |
+| Segmentation | Vision foreground *instance* mask. Every detected object starts selected; **tap an object to include or exclude it**. A tap on empty background picks the nearest object within a small radius. Where Vision can't run (the Simulator), U²-Netp (Core ML) takes over automatically; its single mask is split into separate objects, so tap-to-select still works for products that don't touch |
 | Compositing | Feathered edges, **edge color decontamination (custom Metal CIKernel)**, drop and contact shadows built from the mask. Backgrounds: solid swatches, a custom color, a soft studio-sweep gradient, or transparent |
 | Preview | Live `MTKView` preview rendered by a Metal-backed `CIContext` on a proxy image (≤ 1600 px). It always shows the final framed output |
 | Framing | Automatic crop and centering around the subject, with a fill ratio set per preset |

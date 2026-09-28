@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreImage
 import CoreML
 import Foundation
 import Testing
@@ -31,6 +32,32 @@ struct CoreMLSegmenterTests {
         let truth = try LabelMap(masks: [scene.mask], imageSize: scene.size, renderer: renderer)
         let iou = SegmentationBenchmark.foregroundIoU(result.labelMap, truth)
         #expect(iou > 0.8, "IoU \(iou)")
+    }
+
+    /// Regression: the model's single mask covered both products as one
+    /// "Object 1", so in the Simulator (where U²-Netp stands in for Vision) the
+    /// Select tool found one object and tapping it did nothing.
+    @Test func separateProductsBecomeSeparateSelectableObjects() async throws {
+        let size = CGSize(width: 480, height: 360)
+        let left = SyntheticScene(size: size, subject: CGRect(x: 60, y: 80, width: 150, height: 200))
+        let right = SyntheticScene(size: size, subject: CGRect(x: 330, y: 110, width: 60, height: 140), foreground: RGBA(hex: 0xE8E02A))
+        let source = right.source.applyingFilter("CIBlendWithRedMask", parameters: [
+            kCIInputBackgroundImageKey: left.source,
+            kCIInputMaskImageKey: right.mask,
+        ])
+        let image = try #require(renderer.makeCGImage(source, rect: left.extent))
+        let result = try await makeSegmenter().segment(image)
+
+        #expect(result.instances == [1, 2])
+        let map = result.labelMap
+        let center = { (rect: CGRect) in CGPoint(x: rect.midX / size.width, y: 1 - rect.midY / size.height) }
+        #expect(InstanceHitTester.instance(at: center(left.subject), in: map) == 1) // largest first
+        #expect(InstanceHitTester.instance(at: center(right.subject), in: map) == 2)
+
+        // Each object's mask covers only that object.
+        let bitmap = renderer.rgbaPixels(try result.mask(for: [2]), rect: CGRect(origin: .zero, size: size))
+        #expect(bitmap[Int(left.subject.midX), Int(size.height - left.subject.midY)].r < 10)
+        #expect(bitmap[Int(right.subject.midX), Int(size.height - right.subject.midY)].r > 200)
     }
 }
 

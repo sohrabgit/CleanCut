@@ -77,6 +77,11 @@ final class EditorFlowTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(close.minY, window.minY + 44, "Top bar is under the status bar")
         XCTAssertLessThanOrEqual(edges.maxY, window.maxY - 20, "Tool tabs are under the home indicator")
 
+        app.buttons["Select"].tap()
+        sleep(1)
+        // Library photos go through U²-Netp in the Simulator: check its objects.
+        snapshot(app, "10-select-from-library")
+
         app.buttons["Edges"].tap()
         XCTAssertTrue(app.switches.matching(NSPredicate(format: "label BEGINSWITH 'Clean edges'")).firstMatch.waitForExistence(timeout: 2))
         app.buttons["Close"].tap()

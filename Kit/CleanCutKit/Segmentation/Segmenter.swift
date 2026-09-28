@@ -71,6 +71,48 @@ public struct SegmentationResult: Sendable {
     }
 }
 
+extension SegmentationResult {
+    /// One soft mask covering several objects (a salient-object model's output),
+    /// split along `labelMap`'s instances: each object's mask is `mask` gated to
+    /// the region nearest that object.
+    ///
+    /// The regions partition the image and meet in background, so selecting
+    /// every object returns `mask` itself, and the per-object masks combine
+    /// back into it with `CIMaximumCompositing`.
+    public init(imageSize: CGSize, labelMap: LabelMap, splitting mask: CIImage) {
+        let instances = labelMap.instances
+        let all = IndexSet(instances)
+        // A single object is never split, so skip the partition (the common case).
+        let regions = instances.count > 1 ? labelMap.nearestInstances() : labelMap
+        self.init(imageSize: imageSize, labelMap: labelMap, instances: instances) { selection in
+            guard !all.isSubset(of: selection) else { return mask }
+            let gate = regions.gate(for: selection, size: imageSize)
+            return mask.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: gate])
+        }
+    }
+}
+
+extension LabelMap {
+    /// A mask that is 1 on the selected instances and 0 elsewhere, scaled to
+    /// `size`. It's data, not color, so it's never color-managed; nearest
+    /// sampling keeps it binary. Gray (`L8`), not `R8`, so multiplying by it
+    /// gates every channel rather than zeroing green and blue.
+    func gate(for selection: IndexSet, size: CGSize) -> CIImage {
+        let bytes = Data(labels.map { selection.contains(Int($0)) ? 255 : 0 })
+        let small = CIImage(
+            bitmapData: bytes,
+            bytesPerRow: width,
+            size: CGSize(width: width, height: height),
+            format: .L8,
+            colorSpace: nil
+        )
+        return small
+            .samplingNearest()
+            .transformed(by: CGAffineTransform(scaleX: size.width / CGFloat(width), y: size.height / CGFloat(height)))
+            .cropped(to: CGRect(origin: .zero, size: size))
+    }
+}
+
 extension CGRect {
     /// Converts a normalized, top-left-origin rect into pixel coordinates with a
     /// bottom-left origin (Core Image's convention).

@@ -84,7 +84,7 @@ flowchart LR
 | Engine | Where | Notes |
 |---|---|---|
 | `VisionSegmenter` | device, Mac | Foreground *instance* mask; tap to select; full-res guided mask |
-| `CoreMLSegmenter` | anywhere, incl. Simulator | U²-Netp (bundled, 2.4 MB) or ISNet; one salient object |
+| `CoreMLSegmenter` | anywhere, incl. Simulator | U²-Netp (bundled, 2.4 MB) or ISNet; one salient mask, split into its disconnected objects |
 | `MaskSegmenter` | tests, samples | Precomputed masks |
 | `FallbackSegmenter` | app | Vision, then U²-Netp only on `.unavailable`; real failures surface |
 
