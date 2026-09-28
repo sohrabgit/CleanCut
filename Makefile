@@ -26,8 +26,8 @@ bench: generate ## Build the macOS benchmark CLI (see docs/BENCHMARKS.md)
 	xcodebuild build -project $(PROJECT) -scheme cleancut-bench -configuration Release -destination 'platform=macOS' -derivedDataPath $(DERIVED) | $(FILTER)
 	@echo "Binary: $(DERIVED)/Build/Products/Release/cleancut-bench"
 
-icon: ## Re-render the app icon
-	swift Tools/scripts/make-app-icon.swift App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+icon: ## Re-render the app icon and launch logo
+	swift Tools/scripts/make-app-icon.swift App/Resources/Assets.xcassets
 
 clean: ## Remove build products
 	rm -rf .build
