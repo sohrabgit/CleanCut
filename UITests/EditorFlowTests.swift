@@ -50,6 +50,39 @@ final class EditorFlowTests: XCTestCase {
         snapshot(app, "07-export-sheet")
     }
 
+    /// Regression: opening the editor straight after the Photos picker closed
+    /// laid it out edge to edge, so the top bar sat under the status bar and the
+    /// tool tabs under the home indicator, where taps didn't reach them.
+    /// Needs a photo in the Simulator's library (`xcrun simctl addmedia`).
+    @MainActor
+    func testEditorFromPhotoLibraryStaysInsideTheSafeArea() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-resetState"]
+        app.launch()
+
+        app.buttons["Choose from Photos"].tap()
+        let photo = app.images.matching(NSPredicate(format: "label BEGINSWITH 'Photo'")).firstMatch
+        try XCTSkipUnless(photo.waitForExistence(timeout: 10), "No photos in the Simulator's library")
+        // The picker runs out of process, so its cells report as not hittable.
+        photo.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
+        let export = app.buttons["Export"]
+        XCTAssertTrue(export.waitForExistence(timeout: 30), "Editor should finish processing")
+        sleep(1)
+        snapshot(app, "09-editor-from-library")
+
+        let window = app.windows.firstMatch.frame
+        let close = app.buttons["Close"].frame
+        let edges = app.buttons["Edges"].frame
+        XCTAssertGreaterThanOrEqual(close.minY, window.minY + 44, "Top bar is under the status bar")
+        XCTAssertLessThanOrEqual(edges.maxY, window.maxY - 20, "Tool tabs are under the home indicator")
+
+        app.buttons["Edges"].tap()
+        XCTAssertTrue(app.switches.matching(NSPredicate(format: "label BEGINSWITH 'Clean edges'")).firstMatch.waitForExistence(timeout: 2))
+        app.buttons["Close"].tap()
+        XCTAssertTrue(app.buttons["Choose from Photos"].waitForExistence(timeout: 5), "Close should dismiss the editor")
+    }
+
     @MainActor
     func testBatchEmptyState() {
         let app = XCUIApplication()
