@@ -48,7 +48,9 @@ struct HomeView: View {
         }
         .fullScreenCover(isPresented: $isShowingCamera) {
             CameraPicker { image in
-                if let data = image.jpegData(compressionQuality: 0.95) {
+                guard let data = image.jpegData(compressionQuality: 0.95) else { return }
+                Task {
+                    await waitForPresentationsToSettle()
                     editorSource = .data(data)
                 }
             }
@@ -134,7 +136,22 @@ struct HomeView: View {
             pickerItem = nil
         }
         if let data = try? await item.loadTransferable(type: Data.self) {
+            await waitForPresentationsToSettle()
             editorSource = .data(data)
+        }
+    }
+
+    /// A full-screen cover presented while the Photos picker or camera is still
+    /// animating away gets zero safe-area insets, so the editor's top bar lands
+    /// under the status bar and its tool tabs under the home indicator. Loading
+    /// a local photo usually beats that animation, so wait for UIKit to finish
+    /// the dismissal (capped, in case something else stays presented).
+    private func waitForPresentationsToSettle() async {
+        let root = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow?.rootViewController }
+            .first
+        for _ in 0..<40 where root?.presentedViewController != nil {
+            try? await Task.sleep(for: .milliseconds(50))
         }
     }
 }

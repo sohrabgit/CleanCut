@@ -2,6 +2,10 @@
 
 All notable changes to CleanCut. Versions follow the milestone plan in [docs/SPEC.md](docs/SPEC.md).
 
+## [Unreleased]
+### Fixed
+- After choosing a photo from Photos (or taking one with the camera), the editor no longer spreads under the status bar and home indicator, where the Close/Export buttons and the tool tabs couldn't be tapped. The editor was presented while the picker was still animating away, which left it with no safe-area insets; it now waits for that dismissal to finish.
+
 ## [0.9.0] — Polish & docs (M7)
 ### Added
 - Pinch-to-zoom and pan on the studio canvas (re-renders at the magnified size), double-tap to fit, and a zoom badge.
