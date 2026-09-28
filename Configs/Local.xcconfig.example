@@ -1,0 +1,3 @@
+// Copy to Configs/Local.xcconfig (git-ignored) and set your own team to run on
+// a device or as "My Mac (Designed for iPad)". Not needed for the Simulator.
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
