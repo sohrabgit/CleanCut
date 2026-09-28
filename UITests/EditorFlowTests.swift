@@ -88,6 +88,36 @@ final class EditorFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["Choose from Photos"].waitForExistence(timeout: 5), "Close should dismiss the editor")
     }
 
+    /// Regression: tapping Save to Photos crashed the app. The Photos change
+    /// block inherited the view's `MainActor` isolation, and Photos runs it on
+    /// its own queue, so Swift's runtime isolation check trapped.
+    @MainActor
+    func testSaveToPhotosFromTheExportSheet() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-resetState"]
+        app.launch()
+
+        let sample = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Sample:'")).firstMatch
+        try XCTSkipUnless(sample.waitForExistence(timeout: 5), "No bundled samples in this build")
+        sample.tap()
+
+        let export = app.buttons["Export"]
+        XCTAssertTrue(export.waitForExistence(timeout: 20), "Editor should finish processing")
+        export.tap()
+
+        let save = app.buttons["Save to Photos"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        save.tap()
+
+        // The add-only permission prompt belongs to SpringBoard, not the app.
+        let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            .alerts.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Allow'")).firstMatch
+        if allow.waitForExistence(timeout: 5) { allow.tap() }
+
+        XCTAssertTrue(app.staticTexts["Saved to Photos"].waitForExistence(timeout: 20), "Save should finish without crashing")
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
     @MainActor
     func testBatchEmptyState() {
         let app = XCUIApplication()

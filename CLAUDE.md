@@ -54,6 +54,7 @@ Read [README.md](README.md) for the overview. The deeper docs are [docs/SPEC.md]
 8. `CIContext.createCGImage` rejects single-channel output without a color space. Render the bytes yourself (see `makeMaskImage`).
 9. **Don't present a full-screen cover while another presentation (the Photos picker, the camera) is still animating away.** It gets zero safe-area insets, so the editor's bars land under the status bar and home indicator. Await `waitForPresentationsToSettle()` in `HomeView` first. `EditorFlowTests.testEditorFromPhotoLibraryStaysInsideTheSafeArea` guards this. It skips unless the Simulator's library has a photo (`xcrun simctl addmedia booted <photo>`).
 10. **An `.R8` `CIImage` reads as `(r, 0, 0, 1)`.** Multiplying a mask by it zeroes green and blue. Make gates and other multiplicative masks `.L8` (gray), as `LabelMap.gate` does.
+11. **A closure written in `App/` is `MainActor`-isolated, and Swift checks that at runtime.** If a framework calls it on its own queue (e.g. `PHPhotoLibrary.performChanges`), the app traps with `dispatch_assert_queue`. Build such callbacks in a `nonisolated` helper (see `PhotoLibrary` in `AppServices.swift`).
 
 ## Assets and legal
 - Never commit macOS system pictures or other third-party images. Local dev samples are named `App/Resources/Samples/local-*` and are git-ignored. Only the user's own photos become committed samples (`cleancut-bench sample <photo> --name <name>`).
