@@ -30,7 +30,7 @@ public struct ExportPreset: Identifiable, Hashable, Sendable {
     public let fill: Double
     public let fileType: FileType
     /// When set, the preset overrides the recipe's background.
-    public let requiredBackground: BackgroundStyle?
+    public let requiredBackground: Backdrop?
     public let note: String
 
     public var pixelSize: CGSize { CGSize(width: pixelWidth, height: pixelHeight) }
@@ -52,7 +52,7 @@ public struct ExportPreset: Identifiable, Hashable, Sendable {
     )
 
     public static let amazon = ExportPreset(
-        id: .amazon, name: "Amazon", ratioLabel: "Main",
+        id: .amazon, name: "Amazon", ratioLabel: "1:1 white",
         pixelWidth: 2000, pixelHeight: 2000, fill: 0.85, fileType: .jpeg,
         requiredBackground: .solid(.white),
         note: "Main image: pure white (255, 255, 255) background, product fills ~85% of the frame."

@@ -29,3 +29,6 @@ Models/*.mlpackage
 __pycache__/
 *.pyc
 .build/
+
+# Locally generated samples from non-redistributable images (e.g. macOS system pictures)
+App/Resources/Samples/local-*

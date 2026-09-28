@@ -8,7 +8,7 @@ struct RecipeTests {
         let recipe = Recipe(
             selectedInstances: [1, 3],
             background: .studioSweep(RGBA(hex: 0xF3EEE6)),
-            shadow: ShadowStyle(kind: .soft, intensity: 0.4, angle: 300, distance: 0.1, softness: 0.08),
+            shadow: ShadowSettings(kind: .soft, intensity: 0.4, angle: 300, distance: 0.1, softness: 0.08),
             edges: EdgeSettings(feather: 0.01, cleanEdges: false, cleanStrength: 0.5),
             presetID: .vinted
         )
@@ -37,7 +37,7 @@ struct RecipeTests {
         let clamped = recipe.clamped()
         #expect(clamped.shadow.intensity == 1)
         #expect(clamped.shadow.distance == 0)
-        #expect(clamped.shadow.softness == ShadowStyle.softnessRange.lowerBound)
+        #expect(clamped.shadow.softness == ShadowSettings.softnessRange.lowerBound)
         #expect(clamped.shadow.angle == 270)
         #expect(clamped.edges.feather == EdgeSettings.featherRange.upperBound)
         #expect(clamped.edges.cleanStrength == 0)
@@ -55,7 +55,7 @@ struct RecipeTests {
     }
 
     @Test func freeformPresetsKeepTheChosenBackground() {
-        let color = BackgroundStyle.solid(RGBA(hex: 0xEEEEEE))
+        let color = Backdrop.solid(RGBA(hex: 0xEEEEEE))
         #expect(Recipe(background: color, presetID: .depop).effectiveBackground == color)
         #expect(Recipe(background: color, presetID: .vinted).effectiveBackground == color)
     }

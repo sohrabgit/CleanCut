@@ -9,15 +9,15 @@ import Foundation
 public struct Recipe: Codable, Hashable, Sendable {
     /// Vision instance indices to keep; `nil` keeps every detected instance.
     public var selectedInstances: Set<Int>?
-    public var background: BackgroundStyle
-    public var shadow: ShadowStyle
+    public var background: Backdrop
+    public var shadow: ShadowSettings
     public var edges: EdgeSettings
     public var presetID: ExportPreset.ID
 
     public init(
         selectedInstances: Set<Int>? = nil,
-        background: BackgroundStyle = .solid(.white),
-        shadow: ShadowStyle = .natural,
+        background: Backdrop = .solid(.white),
+        shadow: ShadowSettings = .natural,
         edges: EdgeSettings = .default,
         presetID: ExportPreset.ID = .depop
     ) {
@@ -33,7 +33,7 @@ public struct Recipe: Codable, Hashable, Sendable {
     public var preset: ExportPreset { ExportPreset.preset(for: presetID) }
 
     /// The background actually rendered: presets like Amazon force pure white.
-    public var effectiveBackground: BackgroundStyle {
+    public var effectiveBackground: Backdrop {
         preset.requiredBackground ?? background
     }
 
@@ -48,7 +48,7 @@ public struct Recipe: Codable, Hashable, Sendable {
     }
 }
 
-public enum BackgroundStyle: Codable, Hashable, Sendable {
+public enum Backdrop: Codable, Hashable, Sendable {
     /// A flat color.
     case solid(RGBA)
     /// A soft top-to-bottom studio gradient built around the given color.
@@ -64,7 +64,7 @@ public enum BackgroundStyle: Codable, Hashable, Sendable {
     }
 }
 
-public struct ShadowStyle: Codable, Hashable, Sendable {
+public struct ShadowSettings: Codable, Hashable, Sendable {
     public enum Kind: String, Codable, CaseIterable, Sendable {
         /// No shadow.
         case none
@@ -97,16 +97,16 @@ public struct ShadowStyle: Codable, Hashable, Sendable {
         self.softness = softness
     }
 
-    public static let none = ShadowStyle(kind: .none)
-    public static let soft = ShadowStyle(kind: .soft)
-    public static let contact = ShadowStyle(kind: .contact)
-    public static let natural = ShadowStyle(kind: .natural)
+    public static let none = ShadowSettings(kind: .none)
+    public static let soft = ShadowSettings(kind: .soft)
+    public static let contact = ShadowSettings(kind: .contact)
+    public static let natural = ShadowSettings(kind: .natural)
 
     public static let intensityRange: ClosedRange<Double> = 0...1
     public static let distanceRange: ClosedRange<Double> = 0...0.3
     public static let softnessRange: ClosedRange<Double> = 0.005...0.3
 
-    public func clamped() -> ShadowStyle {
+    public func clamped() -> ShadowSettings {
         var copy = self
         copy.intensity = intensity.clamped(to: Self.intensityRange)
         copy.distance = distance.clamped(to: Self.distanceRange)
