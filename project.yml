@@ -65,6 +65,11 @@ targets:
     platform: iOS
     sources:
       - path: App
+        excludes:
+          - Resources/Samples
+      # A folder reference keeps samples and their mask folders intact in the bundle.
+      - path: App/Resources/Samples
+        type: folder
     dependencies:
       - target: CleanCutKit
     settings:
@@ -91,6 +96,21 @@ targets:
     scheme:
       testTargets:
         - CleanCutKitTests
+        - CleanCutUITests
+
+  # Drives the app end to end in the Simulator; also captures screenshots.
+  CleanCutUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: CleanCut
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.sohrab.cleancut.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: CleanCut
 
   # macOS command-line tool for segmentation benchmarks and batch memory runs.
   cleancut-bench:

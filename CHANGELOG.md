@@ -2,6 +2,19 @@
 
 All notable changes to CleanCut. Versions follow the milestone plan in [docs/SPEC.md](docs/SPEC.md).
 
+## [0.5.0] — Editor (milestones M1–M4)
+### Added
+- **Segmentation:** Vision foreground *instance* masks (iOS 18 Swift API) behind a `Segmenter` protocol. There's a low-res `LabelMap` for tap-to-select with near-miss snapping, and a `MaskSegmenter` for precomputed masks (Simulator, tests).
+- **Pure pipeline:** `Pipeline.makeImage(inputs, recipe, outputSize)` renders in output space: framing, feathering, edge decontamination, drop and contact shadows, backgrounds (solid, studio sweep, transparent).
+- **Custom Metal CIKernel:** `decontaminateEdges` solves the compositing equation to remove backdrop color from soft edges.
+- **Editor:** a live `MTKView` preview through a Metal-backed `CIContext` (on demand, with a display link only while animating), a format segmented control, Select / Background / Shadow / Edges tools, undo/redo, press-and-hold compare, the "lift" reveal, an edge-of-frame tip, and an iPad/Mac inspector layout.
+- **Export:** full-quality render from the working image, JPEG/PNG in sRGB, Save to Photos (add-only), and Share.
+- **Tooling:** the `cleancut-bench render|sample` CLI, UI flow test with screenshot export (`make screenshots`), Vision integration tests on macOS.
+
+### Fixed
+- Combining instance masks with additive compositing doubled alpha, which halved coverage (a see-through cutout). Masks are now combined with a per-pixel maximum.
+- Lanczos resampling clamps at the image border, so a product touching the photo's edge smeared across the canvas. Transformed images are now cropped to their own extent.
+
 ## [0.1.0] — Foundation
 ### Added
 - XcodeGen project: iOS app, multiplatform `CleanCutKit` framework, test bundle, macOS `cleancut-bench` CLI.
