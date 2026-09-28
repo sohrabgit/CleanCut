@@ -44,6 +44,16 @@ final class EditorFlowTests: XCTestCase {
         snapshot(app, "07-export-sheet")
     }
 
+    @MainActor
+    func testBatchEmptyState() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-resetState"]
+        app.launch()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Batch edit'")).firstMatch.tap()
+        XCTAssertTrue(app.buttons["Choose Photos"].waitForExistence(timeout: 5))
+        snapshot(app, "08-batch-empty")
+    }
+
     /// Chips combine their title and subtitle ("Vinted, 4:5") into one label.
     @MainActor
     private func chip(_ app: XCUIApplication, _ title: String) -> XCUIElement {

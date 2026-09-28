@@ -52,7 +52,10 @@ final class EditorModel {
     var tool: Tool = .background
     var isComparing = false
 
-    init(source: PhotoSource, renderer: RenderService = AppServices.renderer) {
+    /// Each editing session owns its render context, released when the editor
+    /// closes: a long-lived context accumulates GPU resources across photos
+    /// (docs/DECISIONS.md, 006).
+    init(source: PhotoSource, renderer: RenderService = RenderService()) {
         self.source = source
         self.renderer = renderer
         let style = StyleStore.load()

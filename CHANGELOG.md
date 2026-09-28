@@ -2,6 +2,16 @@
 
 All notable changes to CleanCut. Versions follow the milestone plan in [docs/SPEC.md](docs/SPEC.md).
 
+## [0.6.0] — Batch mode (M5)
+### Added
+- `BatchProcessor`: a sliding-window task group (bounded concurrency) with ImageIO downsampling at decode, an `AsyncStream` of progress events, cancellation, and per-photo failure isolation.
+- Batch UI: pick up to 50 photos, apply your last style, choose formats, and watch a live progress grid. Cancel, retry failed photos, save all, or share.
+- `MemoryProbe` / `PeakMemorySampler` (`phys_footprint`), plus the `cleancut-bench batch` and `memprobe` commands.
+- [Batch memory report](docs/benchmarks/batch-memory.md).
+
+### Changed
+- Each batch photo and each editor session renders through its own short-lived `CIContext`. A long-lived context accumulated ~1.5 GB across photos, and nothing released it except dropping the context (see DECISIONS 006). Batch peak memory went from ~2.9 GB to ~0.86 GB.
+
 ## [0.5.0] — Editor (milestones M1–M4)
 ### Added
 - **Segmentation:** Vision foreground *instance* masks (iOS 18 Swift API) behind a `Segmenter` protocol. There's a low-res `LabelMap` for tap-to-select with near-miss snapping, and a `MaskSegmenter` for precomputed masks (Simulator, tests).

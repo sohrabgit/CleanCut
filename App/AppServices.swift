@@ -1,11 +1,6 @@
 import CleanCutKit
 import Foundation
 
-/// Process-wide services. One Metal-backed `CIContext` for the whole app.
-enum AppServices {
-    static let renderer = RenderService()
-}
-
 /// Remembers the last style the user applied, so the next photo (and batch
 /// mode) starts from it. The object selection is per photo and isn't kept.
 enum StyleStore {

@@ -13,12 +13,25 @@ public final class RenderService: Sendable {
     public let device: (any MTLDevice)?
     public let commandQueue: (any MTLCommandQueue)?
 
-    public init(useGPU: Bool = true) {
-        let options: [CIContextOption: Any] = [
+    /// - Parameters:
+    ///   - useGPU: Falls back to the software renderer when `false` or when no
+    ///     Metal device exists.
+    ///   - cacheIntermediates: Keep `true` for interactive editing, where the
+    ///     same graph is re-rendered as sliders move; batch work sets it `false`
+    ///     so memory doesn't accumulate across unrelated photos.
+    ///   - memoryLimitMB: Caps the memory Core Image allocates for render tasks
+    ///     (`CIContextOption.memoryTarget`). Without it, the context's texture pool grows
+    ///     to well over a gigabyte across a batch of differently sized photos.
+    public init(useGPU: Bool = true, cacheIntermediates: Bool = true, memoryLimitMB: Int? = nil) {
+        var options: [CIContextOption: Any] = [
             .workingColorSpace: ColorSpaces.linearSRGB,
             .workingFormat: CIFormat.RGBAh,
+            .cacheIntermediates: cacheIntermediates,
             .name: "CleanCut",
         ]
+        if let memoryLimitMB {
+            options[.memoryTarget] = memoryLimitMB
+        }
         if useGPU, let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() {
             queue.label = "CleanCut.render"
             self.device = device

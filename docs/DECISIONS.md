@@ -25,3 +25,8 @@ Short architecture decision records: what was decided, why, and what it costs.
 ## 005 — Main-actor-by-default app, non-isolated kit
 **Decision.** The app target sets `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`. The kit keeps the default (non-isolated) and exposes `Sendable` values and services.
 **Why.** UI code is main-actor code, so the annotation noise goes away. Imaging work is off the main actor by construction. Swift 6's checks enforce the boundary at compile time.
+
+## 006 — A short-lived `CIContext` per photo, not one for the whole app
+**Decision.** Batch mode creates a `CIContext` for each photo, and each editor session owns its own. The usual advice is "create one context and reuse it". That's right for re-rendering the same image (the live preview) and wrong across many unrelated photos.
+**Why.** Measured with `cleancut-bench batch` / `memprobe` on 12 MP photos (M4 Max, macOS 26). A long-lived Metal-backed context grew by 200–300 MB per photo and levelled off around 1.5 GB. `clearCaches()`, `cacheIntermediates: false` and `.memoryTarget` all left it unchanged. With a context per photo, the footprint between photos stays flat at 400–600 MB (≈ 200 MB of which is Vision's model), and batch peak memory fell from ~2.9 GB to ~0.86 GB at the same speed.
+**Cost.** Creating a context per photo costs a few milliseconds, against ~130 ms of work per photo.

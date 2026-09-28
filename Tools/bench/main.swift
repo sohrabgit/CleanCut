@@ -13,11 +13,15 @@ import UniformTypeIdentifiers
 let usage = """
     usage:
       cleancut-bench sample <photo> --name <name> [--out App/Resources/Samples]
+      cleancut-bench batch <folder> [--concurrency 1,2,4] [--presets depop,amazon] [--report <file.md>] [--trace]
+      cleancut-bench memprobe <folder> [--stage load|segment|mask|export] [--fresh-context] [--clear-caches] [--memory-target MB]
       cleancut-bench render <photo> [--out <dir>] [--preset depop|vinted|amazon|cutout|all]
                                     [--background white|sweep|RRGGBB] [--shadow none|soft|contact|natural] [--no-clean]
+                                    [--masks <dir>] [--preview]
     """
 
 struct Arguments {
+    static let booleanFlags: Set<String> = ["fresh-context", "clear-caches", "trace", "preview"]
     var positional: [String] = []
     var options: [String: String] = [:]
     var flags: Set<String> = []
@@ -27,7 +31,7 @@ struct Arguments {
         while let arg = iterator.next() {
             if arg.hasPrefix("--") {
                 let key = String(arg.dropFirst(2))
-                if key.hasPrefix("no-") {
+                if key.hasPrefix("no-") || Arguments.booleanFlags.contains(key) {
                     flags.insert(key)
                 } else if let value = iterator.next() {
                     options[key] = value
@@ -89,7 +93,7 @@ func render(_ args: Arguments) async throws {
         segmenter = VisionSegmenter()
     }
     let photo = try await PreparedPhoto.prepare(image, segmenter: segmenter, renderer: renderer)
-    if args.flags.contains("no-debug-proxy") == false, let inputs = photo.previewInputs(selection: nil) {
+    if args.flags.contains("preview"), let inputs = photo.previewInputs(selection: nil) {
         let preview = Pipeline.makeImage(inputs, recipe: makeRecipe(args), outputSize: CGSize(width: 800, height: 800))
         if let cg = renderer.makeCGImage(preview) {
             try write(cg, to: outDir.appendingPathComponent("\(URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent)-preview.png"), type: .png)
@@ -138,9 +142,147 @@ func write(_ image: CGImage, to url: URL, type: UTType, quality: Double? = nil) 
     guard CGImageDestinationFinalize(destination) else { fail("can't write \(url.path)") }
 }
 
+/// Runs batch mode over a folder of photos at several concurrency levels and
+/// reports wall time and peak memory footprint.
+func batch(_ args: Arguments) async throws {
+    guard let folder = args.positional.first else { fail(usage) }
+    let urls = try FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: folder), includingPropertiesForKeys: nil)
+        .filter { ["jpg", "jpeg", "heic", "png"].contains($0.pathExtension.lowercased()) }
+        .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    guard !urls.isEmpty else { fail("no photos in \(folder)") }
+    let levels = (args.options["concurrency"] ?? "1,2,4").split(separator: ",").compactMap { Int($0) }
+    let presets = (args.options["presets"] ?? "depop,amazon").split(separator: ",").compactMap {
+        ExportPreset.ID(rawValue: String($0)).map(ExportPreset.preset(for:))
+    }
+
+    let (width, height) = try photoSize(urls[0])
+    var rows: [String] = []
+    print("\(urls.count) photos (\(width)×\(height)), presets: \(presets.map(\.name).joined(separator: ", "))")
+    for level in levels {
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent("cleancut-batch-\(level)", isDirectory: true)
+        try? FileManager.default.removeItem(at: output)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+
+        let processor = BatchProcessor(segmenter: VisionSegmenter(), maxConcurrentJobs: level)
+        let jobs = urls.map { url in BatchJob { size in try ImageLoader.load(url: url, maxPixelSize: size) } }
+        let baseline = MemoryProbe.footprint()
+        let sampler = PeakMemorySampler()
+        sampler.start()
+        let clock = ContinuousClock()
+        let start = clock.now
+        var finished = 0, failed = 0
+        for await event in processor.process(jobs, recipe: .default, presets: presets, outputDirectory: output) {
+            switch event {
+            case .finished: finished += 1
+            case .failed: failed += 1
+            case .started: break
+            }
+            if args.flags.contains("trace"), case .started = event {} else if args.flags.contains("trace") {
+                print("  after \(finished + failed): \(megabytes(MemoryProbe.footprint()))")
+            }
+        }
+        let elapsed = (clock.now - start).seconds
+        let peak = sampler.stop()
+        let row = String(
+            format: "| %d | %d | %.1f s | %.2f s | %@ | %@ |",
+            level, finished, elapsed, elapsed / Double(max(finished, 1)),
+            megabytes(peak), megabytes(peak > baseline ? peak - baseline : 0)
+        )
+        rows.append(row)
+        print(row + (failed > 0 ? " (\(failed) failed)" : ""))
+    }
+
+    if let report = args.options["report"] {
+        let markdown = """
+            | Concurrency | Photos | Wall time | Per photo | Peak footprint | Above baseline |
+            |---|---|---|---|---|---|
+            \(rows.joined(separator: "\n"))
+
+            \(urls.count) photos at \(width)×\(height), decoded to ≤ 3072 px, exported as \(presets.map(\.name).joined(separator: " + ")). \(machineDescription()).
+
+            """
+        try markdown.write(toFile: report, atomically: true, encoding: .utf8)
+        print("wrote \(report)")
+    }
+}
+
+/// Diagnostic behind docs/DECISIONS.md 006: prints the memory footprint after
+/// each photo while running progressively more of the pipeline.
+///
+///   --stage load|segment|mask|export   how far to run (default export)
+///   --fresh-context                    new CIContext per photo
+///   --clear-caches                     clearCaches() after each photo
+///   --memory-target <MB>               CIContextOption.memoryTarget
+func memprobe(_ args: Arguments) async throws {
+    guard let folder = args.positional.first else { fail(usage) }
+    let count = Int(args.options["count"] ?? "12") ?? 12
+    let urls = try FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: folder), includingPropertiesForKeys: nil)
+        .filter { ["jpg", "jpeg", "heic"].contains($0.pathExtension.lowercased()) }
+        .sorted { $0.path < $1.path }
+        .prefix(count)
+    let stage = args.options["stage"] ?? "export"
+    let target = args.options["memory-target"].flatMap { Int($0) }
+    let shared = RenderService(cacheIntermediates: false, memoryLimitMB: target)
+    print("stage \(stage), start \(megabytes(MemoryProbe.footprint()))")
+
+    for (index, url) in urls.enumerated() {
+        let image = try ImageLoader.load(url: url, maxPixelSize: 3072)
+        if stage != "load", let result = try? await VisionSegmenter().segment(image) {
+            let renderer = args.flags.contains("fresh-context") ? RenderService(cacheIntermediates: false, memoryLimitMB: target) : shared
+            try autoreleasepool {
+                let mask = try result.mask(for: nil)
+                switch stage {
+                case "mask":
+                    _ = renderer.makeMaskImage(mask)
+                case "export":
+                    guard let bounds = result.subjectBounds(for: nil) else { return }
+                    let inputs = PipelineInputs(source: CIImage(cgImage: image), mask: mask, subjectBounds: bounds)
+                    _ = try Exporter.export(inputs, recipe: .default, preset: .amazon, renderer: renderer)
+                default:
+                    break
+                }
+            }
+            if args.flags.contains("clear-caches") { renderer.context.clearCaches() }
+        }
+        print("  after \(index + 1): \(megabytes(MemoryProbe.footprint()))")
+    }
+}
+
+func photoSize(_ url: URL) throws -> (Int, Int) {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+          let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+          let width = properties[kCGImagePropertyPixelWidth] as? Int,
+          let height = properties[kCGImagePropertyPixelHeight] as? Int
+    else { fail("can't read \(url.path)") }
+    return (width, height)
+}
+
+func megabytes(_ bytes: UInt64) -> String {
+    String(format: "%.0f MB", Double(bytes) / 1_048_576)
+}
+
+func machineDescription() -> String {
+    var size = 0
+    sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0)
+    var buffer = [CChar](repeating: 0, count: size)
+    sysctlbyname("machdep.cpu.brand_string", &buffer, &size, nil, 0)
+    let chip = String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    let os = ProcessInfo.processInfo.operatingSystemVersionString.replacingOccurrences(of: "Version ", with: "")
+    return "\(chip), macOS \(os)"
+}
+
+extension Duration {
+    var seconds: Double {
+        let (seconds, attoseconds) = components
+        return Double(seconds) + Double(attoseconds) / 1e18
+    }
+}
+
 let args = Arguments(CommandLine.arguments.dropFirst(2))
 switch CommandLine.arguments.dropFirst().first {
 case "render": try await render(args)
 case "sample": try await sample(args)
+case "batch": try await batch(args)
+case "memprobe": try await memprobe(args)
 default: fail(usage)
 }
