@@ -6,8 +6,9 @@ import Vision
 /// Salient-object segmentation with a converted open-source Core ML model
 /// (U²-Netp or ISNet, see Tools/ModelConversion).
 ///
-/// The models output one soft mask for "the salient object", so there are no
-/// instances to tap: the result always has a single instance.
+/// The models output one soft mask for everything salient, so the mask is
+/// split into its disconnected objects (`LabelMap.separatingObjects`) to keep
+/// tap-to-select working where Vision can't run.
 public struct CoreMLSegmenter: Segmenter {
     /// Time spent in each stage of the last `segmentWithTimings` call.
     public struct Timings: Sendable {
@@ -53,9 +54,9 @@ public struct CoreMLSegmenter: Segmenter {
             y: size.height / lowResMask.extent.height
         )
         let mask = lowResMask.resampled(by: scale).cropped(to: CGRect(origin: .zero, size: size))
-        let labelMap = try LabelMap(masks: [mask], imageSize: size, renderer: renderer)
+        let labelMap = try LabelMap(masks: [mask], imageSize: size, renderer: renderer).separatingObjects()
         guard !labelMap.instances.isEmpty else { throw SegmentationError.noSubject }
-        let result = SegmentationResult(imageSize: size, labelMap: labelMap, instances: [1]) { _ in mask }
+        let result = SegmentationResult(imageSize: size, labelMap: labelMap, splitting: mask)
         let postprocess = clock.now - start
 
         return (result, Timings(preprocess: preprocess, inference: inference, postprocess: postprocess))

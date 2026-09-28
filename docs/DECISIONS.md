@@ -34,9 +34,14 @@ Short architecture decision records: what was decided, why, and what it costs.
 ## 007 — Vision by default, U²-Netp as the fallback
 **Decision.** Vision's foreground instance mask is the default engine. A bundled 2.4 MB U²-Netp Core ML model takes over only when Vision reports it *can't run here* (`FallbackSegmenter`). Real failures such as "no product found" are shown to the user and never masked.
 **Why.** Vision gives separate instances (tap-to-select), a mask guided to full resolution, and ships no weights. But its instance mask can't create an inference context in the iOS Simulator, and a demo that breaks on a reviewer's first run is a bad demo. U²-Netp runs everywhere and in 4.6 ms on the Neural Engine ([BENCHMARKS](BENCHMARKS.md)).
-**Cost.** U²-Netp finds one salient object, so tap-to-select degrades to a single object. The model upsamples a 320² mask, so its edges are softer than Vision's.
+**Cost.** U²-Netp returns one mask for everything salient, so tap-to-select only works because that mask is split into separate objects (ADR 009); objects that touch stay one. The model upsamples a 320² mask, so its edges are softer than Vision's.
 
 ## 008 — Pin Core ML compute units
 **Decision.** The app runs U²-Netp with `.cpuAndNeuralEngine`, not `.all`.
 **Why.** Measured: `.all` was slower than either CPU+GPU or CPU+ANE for every model tested (U²-Netp 7.5 vs 4.6 ms, ISNet 38 vs 24 ms), probably because the graph gets split across devices.
 **Cost.** Re-measure on each chip generation; the iPhone numbers may differ.
+
+## 009 — Split a salient-object mask into its disconnected objects
+**Decision.** `CoreMLSegmenter` splits U²-Netp's single mask into its 8-connected regions (`LabelMap.separatingObjects`), largest first. Each region becomes an instance you can tap. Its mask is the model's soft mask multiplied by a binary gate: the part of the image nearest that region (`nearestInstances`, sampled nearest-neighbour). Specks under 0.1% of the label map join the nearest object instead of becoming their own chip.
+**Why.** Without it, a photo with two products gave one "Object 1" wherever Vision can't run, and tapping did nothing. The regions partition the image and meet in background, so selecting everything returns the model's mask unchanged. The per-object masks recombine into it under `CIMaximumCompositing`, so preview/export parity holds. A second model (true instance segmentation) would cost download size for a fallback path.
+**Cost.** Touching or overlapping products stay one object: only Vision can separate them. Where two objects nearly touch, the seam between their gates cuts through soft edges at label-map resolution (~4 photo pixels at 2048 px). Post-processing gains ~0.9 ms for the split, plus ~1.9 ms for the partition when there are two or more objects (512×683 map, M4 Max, `-O`).

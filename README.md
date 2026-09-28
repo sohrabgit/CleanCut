@@ -21,7 +21,7 @@
 
 ## Features
 
-- **Remove the background.** Vision finds each object. Tap an object to include or exclude it, and a near miss still snaps to the nearest one. U²-Netp (Core ML) is the fallback where Vision can't run.
+- **Remove the background.** Vision finds each object. Tap an object to include or exclude it, and a near miss still snaps to the nearest one. U²-Netp (Core ML) is the fallback where Vision can't run; its mask is split into separate objects, so tapping still works.
 - **Studio look.** White, paper, sand and other swatches, a studio sweep, a custom color, or transparent. Shadows are None / Soft / Contact / Natural, with intensity, direction, distance and softness.
 - **Clean edges.** A custom Metal kernel removes the old background's color from hair-thin edges (a green halo from a lawn, a warm fringe from a table).
 - **Marketplace formats.** Depop 1:1, Vinted 4:5, Amazon main image (2000 px, pure white, 85% fill), and a transparent PNG cutout. The subject is auto-cropped and centered. Presets live in [one table](Kit/CleanCutKit/Recipe/ExportPreset.swift).

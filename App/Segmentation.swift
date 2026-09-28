@@ -6,7 +6,7 @@ import Foundation
 enum SegmentationEngine: String, CaseIterable, Identifiable {
     /// Vision's foreground instance mask: multiple objects, tap to select.
     case vision
-    /// U²-Netp via Core ML: one salient object, runs anywhere.
+    /// U²-Netp via Core ML: one salient mask, split into separate objects; runs anywhere.
     case u2netp
 
     static let storageKey = "segmentationEngine"
@@ -23,7 +23,7 @@ enum SegmentationEngine: String, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .vision: "Apple's instance segmentation. Finds each object separately, so you can tap to choose."
-        case .u2netp: "Open-source model (Apache-2.0) running on the Neural Engine. One subject per photo."
+        case .u2netp: "Open-source model (Apache-2.0) running on the Neural Engine. Separate products can still be tapped; touching ones stay together."
         }
     }
 

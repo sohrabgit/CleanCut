@@ -49,6 +49,36 @@ struct LabelMapTests {
         #expect(map.boundingBox(of: [7]) == nil)
     }
 
+    @Test func separatingObjectsNumbersDisconnectedRegionsLargestFirst() {
+        // One label for everything, as a salient-object model reports it.
+        var labels = [UInt8](repeating: 0, count: 60)
+        for y in 0..<6 {
+            labels[y * 10 + 0] = 1
+            labels[y * 10 + 7] = 1; labels[y * 10 + 8] = 1; labels[y * 10 + 9] = 1
+        }
+        let separated = LabelMap(width: 10, height: 6, labels: labels).separatingObjects()
+        #expect(separated.instances == [1, 2])
+        #expect(separated[8, 3] == 1) // the wider region on the right
+        #expect(separated[0, 3] == 2)
+        #expect(separated[4, 3] == 0) // background stays background
+    }
+
+    @Test func specksJoinTheNearestObjectInsteadOfBecomingTheirOwn() {
+        var labels = [UInt8](repeating: 0, count: 60)
+        for y in 0..<6 { labels[y * 10 + 0] = 1; labels[y * 10 + 1] = 1 }
+        labels[3 * 10 + 4] = 1 // a one-pixel speck, 1.7% of the map
+        let separated = LabelMap(width: 10, height: 6, labels: labels).separatingObjects(minimumArea: 0.05)
+        #expect(separated.instances == [1])
+        #expect(separated[4, 3] == 1)
+    }
+
+    @Test func nearestInstancesPartitionTheWholeMap() {
+        let owners = map.nearestInstances()
+        #expect(!owners.labels.contains(0))
+        #expect(owners[3, 2] == 1)
+        #expect(owners[6, 2] == 2)
+    }
+
     @Test func normalizedTopLeftRectsFlipIntoCoreImageSpace() {
         let rect = CGRect(x: 0.25, y: 0.1, width: 0.5, height: 0.2)
         let flipped = rect.denormalizedFlipped(to: CGSize(width: 200, height: 100))
@@ -124,6 +154,22 @@ struct PreparedPhotoTests {
         let a = renderer.rgbaPixels(Pipeline.makeImage(preview, recipe: recipe, outputSize: size), rect: rect)
         let b = renderer.rgbaPixels(Pipeline.makeImage(export, recipe: recipe, outputSize: size), rect: rect)
         #expect(a.psnr(against: b) > 35)
+    }
+
+    @Test func splitMaskRecombinesIntoTheOriginal() throws {
+        let rect = CGRect(origin: .zero, size: size)
+        let both = mask(leftRect).applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: mask(rightRect)])
+            .applyingGaussianBlur(sigma: 3).cropped(to: rect)
+        let labelMap = try LabelMap(masks: [both], imageSize: size, renderer: renderer).separatingObjects()
+        let result = SegmentationResult(imageSize: size, labelMap: labelMap, splitting: both)
+        #expect(result.instances == [1, 2])
+
+        let original = renderer.rgbaPixels(both, rect: rect)
+        let recombined = renderer.rgbaPixels(
+            try result.mask(for: [1]).applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: try result.mask(for: [2])]),
+            rect: rect
+        )
+        #expect(recombined.psnr(against: original) > 50)
     }
 
     @Test func proxyMaskOnlyCoversSelectedInstances() async throws {
