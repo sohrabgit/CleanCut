@@ -4,10 +4,12 @@ All notable changes to CleanCut. Versions follow the milestone plan in [docs/SPE
 
 ## [Unreleased]
 ### Added
+- Guided capture: Take Photo opens a live camera that coaches before the shutter. It checks framing (the product is found, whole and big enough), light, sharpness and glare on every frame, shows one steady tip and a four-item checklist, and turns the shutter ring teal with a haptic when the shot is ready. It never blocks the shutter. In the Simulator a staged scene plays instead of a camera, cycling through every tip.
 - A contributor workflow for Claude Code sessions: `CLAUDE.md` (conventions, commands, hard-won gotchas), `/feature` and `/bugfix` project skills, and a PR template.
 - A launch screen: the icon's bottle on the accent teal. Its sparkles twinkle (a staggered swell and quarter turn), then the logo lifts and fades into Home. With Reduce Motion nothing moves and it only fades. It is drawn by the same script as the icon, so the two always match. Home loads underneath from the first frame; the splash stays up for 0.95 s.
 
 ### Changed
+- Take Photo now opens guided capture instead of the system camera.
 - A redesigned app icon: a product on a full-bleed teal field, traced by a dotted cut-out line, with a sparkle. The old icon put a rounded white card inside the rounded icon mask, which read as an icon inside an icon.
 
 ### Fixed
