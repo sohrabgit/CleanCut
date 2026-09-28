@@ -71,11 +71,7 @@ final class EditorFlowTests: XCTestCase {
         sleep(1)
         snapshot(app, "09-editor-from-library")
 
-        let window = app.windows.firstMatch.frame
-        let close = app.buttons["Close"].frame
-        let edges = app.buttons["Edges"].frame
-        XCTAssertGreaterThanOrEqual(close.minY, window.minY + 44, "Top bar is under the status bar")
-        XCTAssertLessThanOrEqual(edges.maxY, window.maxY - 20, "Tool tabs are under the home indicator")
+        assertEditorIsInsideTheSafeArea(app)
 
         app.buttons["Select"].tap()
         sleep(1)
@@ -96,6 +92,44 @@ final class EditorFlowTests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Batch edit'")).firstMatch.tap()
         XCTAssertTrue(app.buttons["Choose Photos"].waitForExistence(timeout: 5))
         snapshot(app, "08-batch-empty")
+    }
+
+    /// Guided capture with the replay camera: a staged problem shows its tip,
+    /// a good shot turns ready, and the shutter opens the editor, inside the
+    /// safe area (the capture cover has to be gone first).
+    @MainActor
+    func testGuidedCaptureOpensTheEditor() throws {
+        let blurry = XCUIApplication()
+        blurry.launchArguments += ["-resetState", "-captureReplay", "blurry"]
+        blurry.launch()
+        blurry.buttons["Take Photo"].tap()
+        XCTAssertTrue(blurry.staticTexts["Hold still, the photo is blurry"].waitForExistence(timeout: 15))
+        snapshot(blurry, "10-capture-blurry")
+
+        let app = XCUIApplication()
+        app.launchArguments += ["-resetState", "-captureReplay", "good"]
+        app.launch()
+        app.buttons["Take Photo"].tap()
+        XCTAssertTrue(app.staticTexts["Looks great, take the photo"].waitForExistence(timeout: 15))
+        snapshot(app, "11-capture-ready")
+
+        app.buttons["shutter"].tap()
+        let export = app.buttons["Export"]
+        XCTAssertTrue(export.waitForExistence(timeout: 30), "Editor should open with the captured photo")
+        sleep(1)
+        snapshot(app, "12-editor-from-capture")
+
+        assertEditorIsInsideTheSafeArea(app)
+    }
+
+    /// The editor's top bar clears the status bar (44 pt on iPhone, 24 on iPad)
+    /// and its tool tabs clear the home indicator.
+    @MainActor
+    private func assertEditorIsInsideTheSafeArea(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let window = app.windows.firstMatch.frame
+        let statusBar: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 24 : 44
+        XCTAssertGreaterThanOrEqual(app.buttons["Close"].frame.minY, window.minY + statusBar, "Top bar is under the status bar", file: file, line: line)
+        XCTAssertLessThanOrEqual(app.buttons["Edges"].frame.maxY, window.maxY - 20, "Tool tabs are under the home indicator", file: file, line: line)
     }
 
     /// Chips combine their title and subtitle ("Vinted, 4:5") into one label.
