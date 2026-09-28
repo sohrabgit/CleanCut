@@ -3,6 +3,7 @@ import CoreImage
 import CoreML
 import Foundation
 import ImageIO
+import Metal
 import UniformTypeIdentifiers
 
 // cleancut-bench — command-line access to the CleanCut pipeline on macOS.
@@ -16,6 +17,7 @@ let usage = """
       cleancut-bench sample <photo> --name <name> [--out App/Resources/Samples]
       cleancut-bench batch <folder> [--concurrency 1,2,4] [--presets depop,amazon] [--report <file.md>] [--trace]
       cleancut-bench segment <folder> [--models Models] [--count 12] [--runs 30] [--report docs/benchmarks/segmentation.md]
+      cleancut-bench preview <photo> [--size 1206x1206] [--frames 120]
       cleancut-bench memprobe <folder> [--stage load|segment|mask|export] [--fresh-context] [--clear-caches] [--memory-target MB]
       cleancut-bench render <photo> [--out <dir>] [--preset depop|vinted|amazon|cutout|all]
                                     [--background white|sweep|RRGGBB] [--shadow none|soft|contact|natural] [--no-clean]
@@ -329,6 +331,68 @@ func segmentBenchmark(_ args: Arguments) async throws {
     }
 }
 
+/// Times live-preview frames the way the editor renders them: proxy inputs,
+/// shared GPU context, rendering into a Metal texture the size of a drawable.
+/// Each scenario changes one recipe parameter per frame, like a slider drag.
+func previewBenchmark(_ args: Arguments) async throws {
+    guard let path = args.positional.first else { fail(usage) }
+    let dims = (args.options["size"] ?? "1206x1206").split(separator: "x").compactMap { Int($0) }
+    guard dims.count == 2 else { fail("bad --size") }
+    let frames = Int(args.options["frames"] ?? "120") ?? 120
+    let renderer = RenderService()
+    guard let device = renderer.device, let queue = renderer.commandQueue else { fail("needs a Metal GPU") }
+
+    let image = try ImageLoader.load(url: URL(fileURLWithPath: path))
+    let photo = try await PreparedPhoto.prepare(image, segmenter: VisionSegmenter(), renderer: renderer)
+    guard let inputs = photo.previewInputs(selection: nil) else { fail("no subject") }
+
+    let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: dims[0], height: dims[1], mipmapped: false)
+    descriptor.usage = [.shaderWrite, .shaderRead, .renderTarget]
+    descriptor.storageMode = .private
+    guard let texture = device.makeTexture(descriptor: descriptor) else { fail("texture") }
+    let size = CGSize(width: dims[0], height: dims[1])
+
+    let scenarios: [(String, (inout Recipe, Int) -> Void)] = [
+        ("Redraw, nothing changed", { _, _ in }),
+        ("Drag shadow intensity", { recipe, i in recipe.shadow.intensity = 0.2 + 0.6 * Double(i % 60) / 60 }),
+        ("Drag edge-clean strength (re-runs kernel)", { recipe, i in recipe.edges.cleanStrength = 0.2 + 0.8 * Double(i % 60) / 60 }),
+        ("Switch backgrounds", { recipe, i in recipe.background = i.isMultiple(of: 2) ? .solid(.white) : .studioSweep(RGBA(hex: 0xEDEBE8)) }),
+        // Worst case: a new matte invalidates the kernel, cutout and shadows.
+        ("Drag edge softness (recomputes everything)", { recipe, i in recipe.edges.feather = 0.001 + 0.015 * Double(i % 60) / 60 }),
+    ]
+
+    print("\(image.width)×\(image.height) photo, proxy \(Int(inputs.source.extent.width))×\(Int(inputs.source.extent.height)), frames \(dims[0])×\(dims[1])")
+    var rows = ["| Scenario | GPU p50 | GPU p90 | Frame p50 (CPU+GPU) | Frame p90 |", "|---|---|---|---|---|"]
+    for (name, mutate) in scenarios {
+        var recipe = Recipe.default
+        var gpu: [Double] = [], total: [Double] = []
+        for i in 0..<(frames + 10) {
+            mutate(&recipe, i)
+            let clock = ContinuousClock()
+            let start = clock.now
+            guard let buffer = queue.makeCommandBuffer() else { continue }
+            let destination = CIRenderDestination(width: dims[0], height: dims[1], pixelFormat: .bgra8Unorm, commandBuffer: buffer) { texture }
+            destination.colorSpace = ColorSpaces.sRGB
+            let frame = Pipeline.makeImage(inputs, recipe: recipe, outputSize: size)
+            _ = try renderer.context.startTask(toRender: frame, to: destination)
+            buffer.commit()
+            await buffer.completed()
+            guard i >= 10 else { continue } // warm-up
+            gpu.append((buffer.gpuEndTime - buffer.gpuStartTime) * 1000)
+            total.append((clock.now - start).milliseconds)
+        }
+        let row = String(format: "| %@ | %.2f ms | %.2f ms | %.2f ms | %.2f ms |", name,
+                         SegmentationBenchmark.percentile(gpu, 0.5), SegmentationBenchmark.percentile(gpu, 0.9),
+                         SegmentationBenchmark.percentile(total, 0.5), SegmentationBenchmark.percentile(total, 0.9))
+        rows.append(row)
+        print(row)
+    }
+    if let report = args.options["report"] {
+        let markdown = rows.joined(separator: "\n") + "\n\n\(frames) frames per scenario at \(dims[0])×\(dims[1]) (iPhone 17 Pro width @3×), after 10 warm-up frames. \(machineDescription()).\n"
+        try markdown.write(toFile: report, atomically: true, encoding: .utf8)
+    }
+}
+
 func photoSize(_ url: URL) throws -> (Int, Int) {
     guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
           let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
@@ -366,5 +430,6 @@ case "sample": try await sample(args)
 case "batch": try await batch(args)
 case "memprobe": try await memprobe(args)
 case "segment": try await segmentBenchmark(args)
+case "preview": try await previewBenchmark(args)
 default: fail(usage)
 }

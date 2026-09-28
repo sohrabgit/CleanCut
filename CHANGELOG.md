@@ -2,6 +2,17 @@
 
 All notable changes to CleanCut. Versions follow the milestone plan in [docs/SPEC.md](docs/SPEC.md).
 
+## [0.9.0] — Polish & docs (M7)
+### Added
+- Pinch-to-zoom and pan on the studio canvas (re-renders at the magnified size), double-tap to fit, and a zoom badge.
+- `cleancut-bench preview`: preview frame times at 1206² (worst case 4.2 ms p50 on M4 Max).
+- A demo recording pipeline: a paced UI flow, `simctl` recording, and a dependency-free MP4→GIF script (`make demo`).
+- README, ARCHITECTURE (mermaid), DECISIONS 007–008, and the preview section in BENCHMARKS.
+
+### Changed
+- Export cards stack the pixel size and file type so they fit at large Dynamic Type sizes.
+- Checked the layout in light and dark mode, at XXL text, and on iPad (inspector layout).
+
 ## [0.7.0] — Core ML benchmark (M6)
 ### Added
 - `Tools/ModelConversion`: a reproducible conversion of U²-Netp and ISNet (Apache-2.0) to Core ML, with pinned dependencies, strict weight loading, a PyTorch parity check, SHA-256 in `Models/manifest.json`, and a 6-bit palettized ISNet variant.

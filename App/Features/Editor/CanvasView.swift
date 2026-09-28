@@ -20,10 +20,10 @@ struct CanvasScene: Equatable {
     var recipe: Recipe
     /// When the cutout "lift" animation started; `nil` once finished.
     var revealStart: Date?
-
-    static func == (lhs: CanvasScene, rhs: CanvasScene) -> Bool {
-        lhs.mode == rhs.mode && lhs.recipe == rhs.recipe && lhs.revealStart == rhs.revealStart
-    }
+    /// Studio-mode magnification for inspecting edges (1 = fit).
+    var zoom: CGFloat = 1
+    /// Studio-mode pan, in points.
+    var pan: CGSize = .zero
 }
 
 /// Shared layout math for the renderer (pixels) and hit-testing (points), so a
@@ -31,12 +31,26 @@ struct CanvasScene: Equatable {
 enum CanvasLayout {
     static let padding: CGFloat = 20
 
+    static let zoomRange: ClosedRange<CGFloat> = 1...4
+
     /// Where content of `contentSize` is drawn inside a view of `viewSize`, in the
     /// view's own units, top-left origin.
     static func contentRect(for contentSize: CGSize, in viewSize: CGSize, scale: CGFloat = 1) -> CGRect {
         let inset = padding * scale
         let bounds = CGRect(origin: .zero, size: viewSize).insetBy(dx: inset, dy: inset)
         return ViewportMath.aspectFit(contentSize, in: bounds).integral
+    }
+
+    /// Magnifies a fitted rect about the view's center, then pans (points).
+    static func zoomed(_ rect: CGRect, zoom: CGFloat, pan: CGSize, in viewSize: CGSize, scale: CGFloat = 1) -> CGRect {
+        guard zoom != 1 || pan != .zero else { return rect }
+        let center = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
+        let size = CGSize(width: rect.width * zoom, height: rect.height * zoom)
+        let origin = CGPoint(
+            x: center.x + (rect.minX - center.x) * zoom + pan.width * scale,
+            y: center.y + (rect.minY - center.y) * zoom + pan.height * scale
+        )
+        return CGRect(origin: origin, size: size).integral
     }
 }
 
@@ -193,7 +207,10 @@ final class PreviewRenderer: NSObject, MTKViewDelegate {
 
     private func studioFrame(photo: PreparedPhoto, recipe: Recipe, drawableSize: CGSize, scale: CGFloat) -> CIImage {
         let preset = recipe.preset
-        let rect = CanvasLayout.contentRect(for: preset.pixelSize, in: drawableSize, scale: scale)
+        let fitted = CanvasLayout.contentRect(for: preset.pixelSize, in: drawableSize, scale: scale)
+        // Zooming re-renders the pipeline at the magnified size; Core Image only
+        // evaluates the part that lands in the drawable.
+        let rect = CanvasLayout.zoomed(fitted, zoom: scene?.zoom ?? 1, pan: scene?.pan ?? .zero, in: drawableSize, scale: scale)
         guard rect.width >= 1, rect.height >= 1,
               let inputs = photo.previewInputs(selection: recipe.selectedInstances)
         else {
@@ -204,6 +221,7 @@ final class PreviewRenderer: NSObject, MTKViewDelegate {
             output = output.composited(over: checkerboard(size: rect.size, scale: scale))
         }
         let card = output.transformed(by: placement(of: rect, in: drawableSize))
+            .cropped(to: CGRect(origin: .zero, size: drawableSize))
         return card.composited(over: cardShadow(for: rect, in: drawableSize, scale: scale))
     }
 

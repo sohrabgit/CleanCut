@@ -1,16 +1,116 @@
 # CleanCut
 
-On-device product-photo studio for iOS: background removal with Vision, studio compositing with Core Image and a custom Metal kernel, and marketplace-ready exports.
+**An on-device product-photo studio for iOS.** Pick or shoot a product photo. CleanCut removes the background, places the product on a clean studio backdrop with a natural shadow, and exports it at the right size for Depop, Vinted or Amazon. Nothing leaves the device.
 
-> 🚧 In active development — see [docs/SPEC.md](docs/SPEC.md) for the plan and [CHANGELOG.md](CHANGELOG.md) for progress.
+[![CI](https://github.com/sohrabgit/CleanCut/actions/workflows/ci.yml/badge.svg)](https://github.com/sohrabgit/CleanCut/actions/workflows/ci.yml)
+![Swift 6](https://img.shields.io/badge/Swift-6-orange) ![iOS 18+](https://img.shields.io/badge/iOS-18%2B-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)
 
-## Build
+<!-- DEMO: docs/media/demo.gif is recorded with `make demo` (see "Recording the demo"). -->
+
+## What this demonstrates
+
+| | |
+|---|---|
+| **Core Image** | A pure pipeline `Pipeline.makeImage(inputs, recipe, size) → CIImage`: framing in output space, feathering, drop and contact shadows built from the mask, studio backdrops. Tests prove the preview and the export match. → [`Pipeline/`](Kit/CleanCutKit/Pipeline) |
+| **Metal** | A custom `CIColorKernel` that removes backdrop color from soft edges by solving the compositing equation. The live preview is an `MTKView` drawn through a Metal-backed `CIContext`, measured at ≤ 5 ms per 1206² frame in the worst case (60 Hz budget: 16.7 ms). → [`EdgeDecontamination.metal`](Kit/CleanCutKit/Kernels/EdgeDecontamination.metal), [`CanvasView.swift`](App/Features/Editor/CanvasView.swift) |
+| **Vision & Core ML** | Vision foreground *instance* masks with tap-to-select. Open-source models (U²-Netp, ISNet; Apache-2.0) are converted reproducibly and benchmarked across CPU / GPU / Neural Engine. → [BENCHMARKS.md](docs/BENCHMARKS.md) |
+| **Swift concurrency** | Swift 6 strict concurrency with warnings as errors. The app is `MainActor` by default and heavy work runs `@concurrent`. Batch mode is a bounded sliding-window `TaskGroup` streaming progress as an `AsyncStream`. → [`BatchProcessor.swift`](Kit/CleanCutKit/Batch/BatchProcessor.swift) |
+| **Performance work** | I measured and fixed batch memory: a long-lived `CIContext` peaked at 2.9 GB, a context per photo stays flat at ~0.9 GB. ImageIO downsamples during decode, and the preview runs on cached proxies. → [DECISIONS 006](docs/DECISIONS.md) |
+| **Product & UX** | A clean, native UI: the photo is the hero and there's one primary action per screen. Every change is live and can be undone. Haptics, VoiceOver, Dynamic Type, Dark Mode, and an iPad/Mac inspector layout. → [SPEC.md](docs/SPEC.md#uiux) |
+| **Testing** | 61 Swift Testing tests that run natively on macOS in ~3 s and on the iOS Simulator, a UI flow test that exports screenshots, and CI. |
+
+## Features
+
+- **Remove the background.** Vision finds each object. Tap an object to include or exclude it, and a near miss still snaps to the nearest one. U²-Netp (Core ML) is the fallback where Vision can't run.
+- **Studio look.** White, paper, sand and other swatches, a studio sweep, a custom color, or transparent. Shadows are None / Soft / Contact / Natural, with intensity, direction, distance and softness.
+- **Clean edges.** A custom Metal kernel removes the old background's color from hair-thin edges (a green halo from a lawn, a warm fringe from a table).
+- **Marketplace formats.** Depop 1:1, Vinted 4:5, Amazon main image (2000 px, pure white, 85% fill), and a transparent PNG cutout. The subject is auto-cropped and centered. Presets live in [one table](Kit/CleanCutKit/Recipe/ExportPreset.swift).
+- **Live preview.** WYSIWYG in the selected format: press and hold to compare, pinch to inspect edges, undo/redo, and a "lift" reveal when the cutout appears.
+- **Export.** Full-quality renders to Photos (add-only permission) or the share sheet, several formats at once.
+- **Batch edit.** Apply your last style to up to 50 photos, with a live progress grid, cancel and retry.
+
+## How it works
+
+```
+photo ──ImageIO (≤4096 px)──► Vision / Core ML ──► soft mask + instance labels
+                                                        │
+Recipe (Codable value) ──► Pipeline.makeImage ◄─────────┘
+   background · shadow · edges · preset
+                    │  1 framing → output space   2 feather   3 edge kernel
+                    │  4 shadows from mask        5 backdrop  → CIImage (lazy)
+                    ▼
+     MTKView preview (proxy, on demand)   ·   export (working image)   ·   batch
+```
+
+- **A `Recipe` is a value.** Undo is a stack of values, batch mode applies one recipe to 50 photos, and the last style is remembered as JSON.
+- **Every length in the recipe is relative to the subject.** So the 320 px preview and the 2000 px export look identical: *PSNR > 32 dB* in `previewAndExportLookTheSame`.
+- **Masks are treated as data, not color**: they're never color-managed. That, plus exact sRGB output, is why Amazon's white measures exactly `(255, 255, 255)`, and the tests check it.
+
+Details: [ARCHITECTURE.md](docs/ARCHITECTURE.md) · trade-offs: [DECISIONS.md](docs/DECISIONS.md) · product and UX spec: [SPEC.md](docs/SPEC.md).
+
+## Benchmarks (Apple M4 Max, macOS 26)
+
+| Engine | Best compute units | Size | Inference p50 | CPU only | `.all` | IoU vs Vision |
+|---|---|---|---|---|---|---|
+| Vision (instance mask) | Neural Engine | system | **15.0 ms** | unsupported | – | ref. |
+| U²-Netp 320² | CPU + Neural Engine | 2.4 MB | **4.6 ms** | 16.9 ms | 7.5 ms | 0.958 |
+| ISNet 1024² fp16 | CPU + Neural Engine | 84 MB | **25.1 ms** | 103 ms | 38.7 ms | 0.956 |
+| ISNet 1024², 6-bit palettized | CPU + Neural Engine | 32 MB | **24.2 ms** | 103 ms | 37.5 ms | 0.955 |
+
+What stood out:
+- Pinning compute units beats `.all`.
+- 6-bit palettization makes the file 2.6× smaller at no measurable cost.
+- The first Neural Engine load of ISNet compiles on device for 8–9 s. The OS then caches it by model location, and later loads take about 30 ms.
+
+Full table, method and caveats: [BENCHMARKS.md](docs/BENCHMARKS.md). iPhone numbers are still to come; the harness is in the framework.
+
+**Preview:** 0.5 ms per frame for a redraw, 1.5–1.9 ms while dragging a shadow or edge slider, and 4.2 ms (p90 5.1 ms) in the worst case where everything recomputes. Measured at 1206×1206.
+
+**Batch:** 50 × 12 MP photos take 1.8 s with 4 workers. Peak footprint is 0.87 GB with 1 worker and 1.4 GB with 4, and the footprint between photos stays flat.
+
+## Build and run
+
+Requires Xcode 26, iOS 18+ and Swift 6.
 
 ```sh
 brew install xcodegen
-make generate   # creates CleanCut.xcodeproj from project.yml
-make test       # runs the CleanCutKit test suite natively on macOS
+make generate      # CleanCut.xcodeproj from project.yml
+make test          # CleanCutKit tests, natively on macOS (~3 s)
 open CleanCut.xcodeproj
 ```
 
-Requires Xcode 26 · iOS 18+ · Swift 6.
+- **Simulator.** Vision's instance mask can't run there ("Could not create inference context"). CleanCut falls back to U²-Netp for your own photos, and to precomputed masks for bundled samples.
+- **Mac.** Run the app natively as *My Mac (Designed for iPad)* to use real Vision and the Neural Engine. Copy `Configs/Local.xcconfig.example` to `Configs/Local.xcconfig` and set your team.
+
+| Command | What it does |
+|---|---|
+| `make test` / `make test-ios` | Kit tests on macOS / iOS Simulator |
+| `make screenshots` | UI flow test in the Simulator, screenshots to `.build/screenshots` |
+| `make bench` | Builds `cleancut-bench` (`render`, `sample`, `batch`, `segment`, `memprobe`) |
+| `make -C Tools/ModelConversion` | Converts U²-Netp and ISNet to Core ML (pinned Python env via `uv`) |
+| `make demo` | Records the demo GIF from the Simulator |
+
+## Project layout
+
+```
+App/                     SwiftUI app: Home, Editor (canvas, tools), Export, Batch, Settings, DesignSystem
+Kit/CleanCutKit/         Recipe, Pipeline, Kernels (Metal), Segmentation, Rendering, Batch, Bench
+Tests/CleanCutKitTests/  Swift Testing suite (+ synthetic scenes)
+UITests/                 End-to-end flow, screenshots, demo recording
+Tools/bench/             macOS CLI: render, sample, batch, segment, memprobe
+Tools/ModelConversion/   PyTorch → Core ML conversion (U²-Netp, ISNet)
+Models/                  U2Netp.mlpackage (+ generated ISNet variants, git-ignored)
+docs/                    SPEC, ARCHITECTURE, DECISIONS, BENCHMARKS
+```
+
+## What I'd do next
+
+- **iPhone numbers.** Add an in-app "Lab" screen on top of `SegmentationBenchmark`, and publish a benchmark table per chip.
+- **Prewarm the model.** Load the Core ML model in the background on first launch to absorb the one-time Neural Engine compile.
+- **Better matting.** Guided-filter refinement of the Core ML masks (they're upsampled from 320²), and a multi-level foreground estimate for the edge kernel.
+- **Fidelity check.** OCR before and after to flag product labels the mask clipped.
+- **Templates.** Share `Recipe` JSON between sellers ("shop style").
+
+## License
+
+MIT for the code (see [LICENSE](LICENSE)). The bundled U²-Netp model is Apache-2.0 (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).

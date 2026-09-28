@@ -17,7 +17,7 @@ OCR fidelity checks, generative backgrounds, manual brush mask editing, accounts
 | Area | Behaviour |
 |---|---|
 | Import | Photos picker (single & multi), camera (device only), bundled sample photos, drag & drop (iPad/Mac) |
-| Segmentation | Vision foreground *instance* mask. Every detected object starts selected; **tap an object to include or exclude it**. A tap on empty background picks the nearest object within a small radius |
+| Segmentation | Vision foreground *instance* mask. Every detected object starts selected; **tap an object to include or exclude it**. A tap on empty background picks the nearest object within a small radius. Where Vision can't run (the Simulator), U²-Netp (Core ML) takes over automatically |
 | Compositing | Feathered edges, **edge color decontamination (custom Metal CIKernel)**, drop and contact shadows built from the mask. Backgrounds: solid swatches, a custom color, a soft studio-sweep gradient, or transparent |
 | Preview | Live `MTKView` preview rendered by a Metal-backed `CIContext` on a proxy image (≤ 1600 px). It always shows the final framed output |
 | Framing | Automatic crop and centering around the subject, with a fill ratio set per preset |
@@ -47,7 +47,7 @@ Defined in one table: [`ExportPreset.swift`](../Kit/CleanCutKit/Recipe/ExportPre
 1. **Home**: one large "Add product photo" card (Photos / Camera), a quieter "Batch edit" button, and a row of samples to try. One line explains what the app does.
 2. **Editor**
    - Top bar: Close · Undo / Redo · **Compare** (press and hold to see the original) · **Export** (the primary action).
-   - Canvas: the final framed output in the chosen format's aspect ratio.
+   - Canvas: the final framed output in the chosen format's aspect ratio. Pinch to zoom and inspect edges, drag to pan, double-tap to fit.
    - Format chips above the tools: `1:1 Depop · 4:5 Vinted · Amazon · PNG`.
    - Tool tray with four tabs of at most 3 controls each:
      - **Select**: objects outlined with a soft pulsing glow; tap to toggle (haptic + VoiceOver announcement).

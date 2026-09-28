@@ -30,3 +30,13 @@ Short architecture decision records: what was decided, why, and what it costs.
 **Decision.** Batch mode creates a `CIContext` for each photo, and each editor session owns its own. The usual advice is "create one context and reuse it". That's right for re-rendering the same image (the live preview) and wrong across many unrelated photos.
 **Why.** Measured with `cleancut-bench batch` / `memprobe` on 12 MP photos (M4 Max, macOS 26). A long-lived Metal-backed context grew by 200–300 MB per photo and levelled off around 1.5 GB. `clearCaches()`, `cacheIntermediates: false` and `.memoryTarget` all left it unchanged. With a context per photo, the footprint between photos stays flat at 400–600 MB (≈ 200 MB of which is Vision's model), and batch peak memory fell from ~2.9 GB to ~0.86 GB at the same speed.
 **Cost.** Creating a context per photo costs a few milliseconds, against ~130 ms of work per photo.
+
+## 007 — Vision by default, U²-Netp as the fallback
+**Decision.** Vision's foreground instance mask is the default engine. A bundled 2.4 MB U²-Netp Core ML model takes over only when Vision reports it *can't run here* (`FallbackSegmenter`). Real failures such as "no product found" are shown to the user and never masked.
+**Why.** Vision gives separate instances (tap-to-select), a mask guided to full resolution, and ships no weights. But its instance mask can't create an inference context in the iOS Simulator, and a demo that breaks on a reviewer's first run is a bad demo. U²-Netp runs everywhere and in 4.6 ms on the Neural Engine ([BENCHMARKS](BENCHMARKS.md)).
+**Cost.** U²-Netp finds one salient object, so tap-to-select degrades to a single object. The model upsamples a 320² mask, so its edges are softer than Vision's.
+
+## 008 — Pin Core ML compute units
+**Decision.** The app runs U²-Netp with `.cpuAndNeuralEngine`, not `.all`.
+**Why.** Measured: `.all` was slower than either CPU+GPU or CPU+ANE for every model tested (U²-Netp 7.5 vs 4.6 ms, ISNet 38 vs 24 ms), probably because the graph gets split across devices.
+**Cost.** Re-measure on each chip generation; the iPhone numbers may differ.

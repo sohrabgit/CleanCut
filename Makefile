@@ -5,7 +5,7 @@ PROJECT := CleanCut.xcodeproj
 SIM ?= iPhone 17 Pro
 FILTER := Tools/scripts/xcfilter.sh
 
-.PHONY: help generate test test-ios build bench icon clean screenshots
+.PHONY: help generate test test-ios build bench icon clean screenshots demo
 
 help:
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -37,3 +37,6 @@ screenshots: generate ## Run the UI flow test in the Simulator and export its sc
 	xcodebuild test -project $(PROJECT) -scheme CleanCut -destination 'platform=iOS Simulator,name=$(SIM)' -derivedDataPath $(DERIVED) -only-testing:CleanCutUITests -resultBundlePath .build/ui.xcresult | $(FILTER) || true
 	xcrun xcresulttool export attachments --path .build/ui.xcresult --output-path .build/screenshots > /dev/null
 	@Tools/scripts/export-screenshots.py .build/screenshots
+
+demo: ## Record the README demo GIF from the Simulator (docs/media/demo.gif)
+	Tools/scripts/record-demo.sh "$(SIM)" docs/media/demo.gif

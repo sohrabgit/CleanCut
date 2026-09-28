@@ -10,6 +10,7 @@ make bench                             # builds the CLI
 B=.build/dd/Build/Products/Release/cleancut-bench
 $B segment <photo-folder> --count 12 --runs 30 --report docs/benchmarks/segmentation-m4max.md
 $B batch   <photo-folder> --concurrency 1,2,4 --report docs/benchmarks/batch-memory.md
+$B preview <photo> --report docs/benchmarks/preview-m4max.md
 ```
 
 ## 1. Segmentation: Vision vs Core ML across compute units
@@ -48,7 +49,24 @@ The input was 12 photos at ≤ 2048 px, with 5 warm-up and 30 measured runs per 
 3. **6-bit palettization is nearly free here.** ISNet shrinks from 84 MB to 32 MB (2.6× smaller) with the same latency on the GPU and Neural Engine, and its agreement with Vision drops from 0.956 to 0.955. For an app download size, that's an easy trade.
 4. **Vision is the practical default.** At about 15 ms on the Neural Engine it gives separate instances (tap-to-select), a mask guided to full resolution, and no bundled weights. U²-Netp is the fallback: 3× faster, 2.4 MB, and it runs in the Simulator, where Vision's instance mask can't.
 
-## 2. Batch mode: bounded memory
+## 2. Live preview frame time
+
+`cleancut-bench preview <photo>` renders frames exactly like the editor does: the proxy inputs and the shared GPU context drawing into a Metal texture the size of a drawable. Each scenario changes one parameter per frame, as a slider drag would.
+
+| Scenario | GPU p50 | GPU p90 | Frame p50 (CPU+GPU) | Frame p90 |
+|---|---|---|---|---|
+| Redraw, nothing changed | 0.07 ms | 0.11 ms | 0.50 ms | 0.86 ms |
+| Drag shadow intensity | 0.38 ms | 0.48 ms | 1.54 ms | 1.77 ms |
+| Drag edge-clean strength (re-runs kernel) | 0.20 ms | 0.23 ms | 1.92 ms | 2.15 ms |
+| Switch backgrounds | 0.07 ms | 0.08 ms | 0.52 ms | 0.60 ms |
+| Drag edge softness (recomputes everything) | 0.93 ms | 1.20 ms | 4.19 ms | 5.11 ms |
+
+120 frames per scenario at 1206×1206 (iPhone 17 Pro width @3×), after 10 warm-up frames. Apple M4 Max, macOS 26.6.2 (Build 25G83).
+
+- **Budget:** 16.7 ms per frame at 60 Hz and 8.3 ms at 120 Hz. Even the worst case, where every frame gets a new matte and so the kernel, cutout and shadows all recompute, leaves about 3× headroom on this Mac. The iPhone GPU is several times slower, so on-device numbers are the next thing to measure. The HUD in Settings shows them live.
+- Cheap edits stay cheap because Core Image reuses unchanged subgraphs: the cutout is an explicit cached intermediate. Changing the backdrop costs as much as a redraw.
+
+## 3. Batch mode: bounded memory
 
 | Concurrency | Photos | Wall time | Per photo | Peak footprint | Above baseline |
 |---|---|---|---|---|---|
@@ -70,7 +88,7 @@ The input was 50 photos at 4032×3024, decoded to ≤ 3072 px, and exported as D
 
 `clearCaches()`, `cacheIntermediates: false` and `.memoryTarget` did not release the growth. Only dropping the context did.
 
-## 3. Pipeline correctness
+## 4. Pipeline correctness
 
 The pipeline test suite checks these invariants on every run (see `Tests/CleanCutKitTests`):
 - the Amazon preset's background is exactly `(255, 255, 255)` even under a natural shadow;

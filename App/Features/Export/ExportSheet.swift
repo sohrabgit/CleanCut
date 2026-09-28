@@ -234,11 +234,14 @@ private struct PresetCard: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(preset.name).font(.subheadline.weight(.semibold))
-                        Text(verbatim: "\(preset.pixelWidth)×\(preset.pixelHeight) \(preset.fileType.rawValue.uppercased())")
+                        Text(verbatim: "\(preset.pixelWidth)×\(preset.pixelHeight)")
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.8)
+                            .minimumScaleFactor(0.6)
+                        Text(preset.fileType.rawValue.uppercased())
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.tertiary)
                     }
                     Spacer(minLength: 0)
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")

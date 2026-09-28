@@ -27,6 +27,12 @@ final class EditorFlowTests: XCTestCase {
         app.buttons["Shadow"].tap()
         snapshot(app, "03-editor-shadow")
 
+        let canvas = app.images.matching(NSPredicate(format: "label BEGINSWITH 'Studio preview'")).firstMatch
+        XCTAssertTrue(canvas.exists)
+        canvas.pinch(withScale: 2.5, velocity: 2)
+        snapshot(app, "03b-editor-zoomed")
+        canvas.doubleTap()
+
         app.buttons["Select"].tap()
         snapshot(app, "04-editor-select")
 

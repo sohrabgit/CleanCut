@@ -5,6 +5,8 @@ struct EditorView: View {
     @State private var model: EditorModel
     @State private var isExporting = false
     @State private var dismissedEdgeTip = false
+    @State private var gestureZoom: CGFloat = 1
+    @State private var gesturePan: CGSize = .zero
     @AppStorage("showPerformanceHUD") private var showHUD = false
     @AppStorage("hasSeenSelectHint") private var hasSeenSelectHint = false
     @Environment(\.dismiss) private var dismiss
@@ -119,13 +121,21 @@ struct EditorView: View {
 
     private func readyCanvas(_ photo: PreparedPhoto) -> some View {
         GeometryReader { geometry in
-            CanvasView(photo: photo, scene: model.canvasScene, renderer: model.renderer, stats: model.stats)
+            CanvasView(photo: photo, scene: liveScene, renderer: model.renderer, stats: model.stats)
                 .contentShape(Rectangle())
                 .onTapGesture { location in
                     if model.handleTap(at: location, in: geometry.size) != nil {
                         hasSeenSelectHint = true
                     }
                 }
+                .gesture(zoomGesture, isEnabled: model.tool != .select)
+                // Simultaneous, so single taps (tap-to-select) never wait on it.
+                .simultaneousGesture(
+                    TapGesture(count: 2).onEnded {
+                        withAnimation(Tokens.Motion.spring) { model.resetZoom() }
+                    },
+                    isEnabled: model.tool != .select
+                )
                 .accessibilityElement()
                 .accessibilityLabel(canvasAccessibilityLabel)
                 .accessibilityAddTraits(.isImage)
@@ -134,14 +144,63 @@ struct EditorView: View {
         .overlay(alignment: .topLeading) {
             if showHUD { PerformanceHUD(stats: model.stats).padding(Tokens.Spacing.m) }
         }
+        .overlay(alignment: .topTrailing) {
+            if liveScene.zoom > 1.01 {
+                Button {
+                    withAnimation(Tokens.Motion.spring) { model.resetZoom() }
+                } label: {
+                    Text("\(liveScene.zoom, specifier: "%.1f")× · Fit")
+                        .font(.footnote.weight(.semibold).monospacedDigit())
+                        .padding(.horizontal, Tokens.Spacing.s)
+                        .padding(.vertical, Tokens.Spacing.xs)
+                        .background(.regularMaterial, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(Tokens.Spacing.m)
+                .accessibilityLabel("Zoomed \(Int(liveScene.zoom * 100)) percent. Fit to screen")
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
+        }
         .sensoryFeedback(.selection, trigger: model.recipe.selectedInstances)
+    }
+
+    /// The model's scene plus the in-flight pinch/drag, so gestures track 1:1.
+    private var liveScene: CanvasScene {
+        var scene = model.canvasScene
+        scene.zoom = (model.zoom * gestureZoom).clamped(to: CanvasLayout.zoomRange)
+        scene.pan = CGSize(width: model.pan.width + gesturePan.width, height: model.pan.height + gesturePan.height)
+        if scene.zoom == 1 { scene.pan = .zero }
+        return scene
+    }
+
+    /// Pinch to magnify and drag to pan the studio preview (edge inspection).
+    private var zoomGesture: some Gesture {
+        MagnifyGesture()
+            .onChanged { gestureZoom = $0.magnification }
+            .onEnded { value in
+                model.zoom = (model.zoom * value.magnification).clamped(to: CanvasLayout.zoomRange)
+                if model.zoom == 1 { model.pan = .zero }
+                gestureZoom = 1
+            }
+            .simultaneously(with: DragGesture(minimumDistance: 8)
+                .onChanged { value in
+                    guard model.zoom * gestureZoom > 1 else { return }
+                    gesturePan = value.translation
+                }
+                .onEnded { value in
+                    if model.zoom > 1 {
+                        model.pan.width += value.translation.width
+                        model.pan.height += value.translation.height
+                    }
+                    gesturePan = .zero
+                })
     }
 
     private var canvasAccessibilityLabel: String {
         switch model.canvasScene.mode {
         case .original: "Original photo"
         case .select: "Photo with \(model.instances.count) detected objects. Use the object buttons below to include or exclude them."
-        case .studio: "Studio preview, \(model.recipe.preset.name) format"
+        case .studio: "Studio preview, \(model.recipe.preset.name) format. Pinch to zoom, double-tap to fit."
         }
     }
 
@@ -297,4 +356,10 @@ struct ToolbarIconButtonStyle: ButtonStyle {
 
 extension ButtonStyle where Self == ToolbarIconButtonStyle {
     static var toolbarIcon: ToolbarIconButtonStyle { ToolbarIconButtonStyle() }
+}
+
+extension Comparable {
+    func clamped(to range: ClosedRange<Self>) -> Self {
+        min(max(self, range.lowerBound), range.upperBound)
+    }
 }

@@ -49,8 +49,17 @@ final class EditorModel {
     var recipe: Recipe
     private var history: History<Recipe>
 
-    var tool: Tool = .background
+    var tool: Tool = .background {
+        didSet { if tool == .select { resetZoom() } }
+    }
     var isComparing = false
+    var zoom: CGFloat = 1
+    var pan: CGSize = .zero
+
+    func resetZoom() {
+        zoom = 1
+        pan = .zero
+    }
 
     /// Each editing session owns its render context, released when the editor
     /// closes: a long-lived context accumulates GPU resources across photos
@@ -108,7 +117,7 @@ final class EditorModel {
 
     var canvasScene: CanvasScene {
         let mode: CanvasScene.Mode = isComparing ? .original : (tool == .select ? .select : .studio)
-        return CanvasScene(mode: mode, recipe: recipe, revealStart: revealStart)
+        return CanvasScene(mode: mode, recipe: recipe, revealStart: revealStart, zoom: zoom, pan: pan)
     }
 
     /// True when the product runs off the photo's edge; the cut there will be
