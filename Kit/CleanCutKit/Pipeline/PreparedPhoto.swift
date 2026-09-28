@@ -22,13 +22,18 @@ public struct PreparedPhoto: Sendable {
 
     public var instances: [Int] { segmentation.instances }
 
+    /// The engine that produced the masks, e.g. "Vision" or "U²-Netp".
+    public var segmenterName: String = ""
+
     public static func prepare(
         _ image: CGImage,
         segmenter: any Segmenter,
         renderer: RenderService
     ) async throws -> PreparedPhoto {
         let segmentation = try await segmenter.segment(image)
-        return try prepare(image, segmentation: segmentation, renderer: renderer)
+        var photo = try prepare(image, segmentation: segmentation, renderer: renderer)
+        photo.segmenterName = (segmenter as? FallbackSegmenter)?.lastUsedName ?? segmenter.name
+        return photo
     }
 
     /// Builds the proxy for an image that has already been segmented.

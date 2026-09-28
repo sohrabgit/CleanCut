@@ -92,16 +92,16 @@ final class EditorModel {
     }
 
     private func prepare(_ image: CGImage) async throws -> PreparedPhoto {
-        do {
-            return try await PreparedPhoto.prepare(image, segmenter: VisionSegmenter(), renderer: renderer)
-        } catch SegmentationError.unavailable {
-            // Simulator: samples ship with masks precomputed by Vision on a Mac.
-            guard case .sample(let sample) = source, !sample.maskURLs.isEmpty else {
-                throw SegmentationError.unavailable("")
-            }
-            let segmenter = MaskSegmenter(name: "Bundled masks", masks: sample.masks(), renderer: renderer)
-            return try await PreparedPhoto.prepare(image, segmenter: segmenter, renderer: renderer)
+        var segmenter = Segmenters.make(renderer: renderer)
+        // Where Vision can't run (the Simulator), samples use the instance masks
+        // Vision precomputed for them on a Mac rather than a single-subject model.
+        if case .sample(let sample) = source, !sample.maskURLs.isEmpty, SegmentationEngine.current == .vision {
+            segmenter = FallbackSegmenter(
+                primary: VisionSegmenter(),
+                fallback: MaskSegmenter(name: "Bundled masks", masks: sample.masks(), renderer: renderer)
+            )
         }
+        return try await PreparedPhoto.prepare(image, segmenter: segmenter, renderer: renderer)
     }
 
     // MARK: - Canvas

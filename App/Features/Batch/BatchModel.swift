@@ -115,7 +115,7 @@ final class BatchModel {
                 return try ImageLoader.load(data: data, maxPixelSize: maxPixelSize)
             }
         }
-        let processor = BatchProcessor(segmenter: VisionSegmenter())
+        let processor = BatchProcessor(segmenter: Segmenters.make(renderer: RenderService(cacheIntermediates: false)))
         let stream = processor.process(jobs, recipe: recipe, presets: selectedPresets, outputDirectory: outputDirectory)
 
         work = Task {

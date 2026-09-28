@@ -14,6 +14,12 @@ public struct VisionSegmenter: Segmenter {
         self.computeDevice = computeDevice
     }
 
+    /// Every compute device on this machine. Devices the request can't use
+    /// fail at `segment` time and show up as "unsupported" in benchmarks.
+    public static var supportedComputeDevices: [MLComputeDevice] {
+        MLComputeDevice.allComputeDevices
+    }
+
     public var name: String {
         guard let computeDevice else { return "Vision" }
         return "Vision (\(computeDevice.shortName))"

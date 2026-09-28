@@ -2,6 +2,14 @@
 
 All notable changes to CleanCut. Versions follow the milestone plan in [docs/SPEC.md](docs/SPEC.md).
 
+## [0.7.0] — Core ML benchmark (M6)
+### Added
+- `Tools/ModelConversion`: a reproducible conversion of U²-Netp and ISNet (Apache-2.0) to Core ML, with pinned dependencies, strict weight loading, a PyTorch parity check, SHA-256 in `Models/manifest.json`, and a 6-bit palettized ISNet variant.
+- `CoreMLSegmenter`: a Float16 grayscale-image output wrapped straight into a `CIImage`, per-stage timings, and the model isolated in an actor.
+- `SegmentationBenchmark` and `cleancut-bench segment`: every engine × compute unit, measuring load, reload, first run, p50/p90, end-to-end, IoU vs Vision and peak memory. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+- The app bundles U²-Netp: it's a Settings option and the automatic fallback where Vision can't run (the Simulator), through `FallbackSegmenter`.
+- `THIRD_PARTY_NOTICES.md` and an Acknowledgements screen.
+
 ## [0.6.0] — Batch mode (M5)
 ### Added
 - `BatchProcessor`: a sliding-window task group (bounded concurrency) with ImageIO downsampling at decode, an `AsyncStream` of progress events, cancellation, and per-photo failure isolation.

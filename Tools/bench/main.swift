@@ -1,5 +1,6 @@
 import CleanCutKit
 import CoreImage
+import CoreML
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
@@ -14,6 +15,7 @@ let usage = """
     usage:
       cleancut-bench sample <photo> --name <name> [--out App/Resources/Samples]
       cleancut-bench batch <folder> [--concurrency 1,2,4] [--presets depop,amazon] [--report <file.md>] [--trace]
+      cleancut-bench segment <folder> [--models Models] [--count 12] [--runs 30] [--report docs/benchmarks/segmentation.md]
       cleancut-bench memprobe <folder> [--stage load|segment|mask|export] [--fresh-context] [--clear-caches] [--memory-target MB]
       cleancut-bench render <photo> [--out <dir>] [--preset depop|vinted|amazon|cutout|all]
                                     [--background white|sweep|RRGGBB] [--shadow none|soft|contact|natural] [--no-clean]
@@ -248,6 +250,85 @@ func memprobe(_ args: Arguments) async throws {
     }
 }
 
+/// Benchmarks Vision against the converted Core ML models across compute units.
+func segmentBenchmark(_ args: Arguments) async throws {
+    guard let folder = args.positional.first else { fail(usage) }
+    let count = Int(args.options["count"] ?? "12") ?? 12
+    let runs = Int(args.options["runs"] ?? "30") ?? 30
+    let modelsDir = URL(fileURLWithPath: args.options["models"] ?? "Models", isDirectory: true)
+    let renderer = RenderService()
+
+    // Photos Vision finds a product in, decoded like the editor does for preview work.
+    var images: [CGImage] = []
+    var reference: [LabelMap] = []
+    let urls = try FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: folder), includingPropertiesForKeys: nil)
+        .filter { ["jpg", "jpeg", "heic", "png"].contains($0.pathExtension.lowercased()) }
+        .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    for url in urls where images.count < count {
+        let image = try ImageLoader.load(url: url, maxPixelSize: 2048)
+        guard let result = try? await VisionSegmenter().segment(image) else { continue }
+        images.append(image)
+        reference.append(result.labelMap)
+    }
+    print("\(images.count) photos with a detectable product")
+    let benchmark = SegmentationBenchmark(images: images, measuredRuns: runs)
+
+    var configurations: [BenchmarkConfiguration] = [
+        BenchmarkConfiguration(engine: "Vision", compute: "Auto", modelSizeMB: nil, loadsLazily: true) { VisionSegmenter() },
+    ]
+    for device in VisionSegmenter.supportedComputeDevices {
+        configurations.append(BenchmarkConfiguration(engine: "Vision", compute: device.shortName, modelSizeMB: nil, loadsLazily: true) {
+            VisionSegmenter(computeDevice: device)
+        })
+    }
+
+    struct ManifestEntry: Decodable { let name: String; let package: String; let sizeMB: Double }
+    let manifestURL = modelsDir.appendingPathComponent("manifest.json")
+    let manifest = (try? JSONDecoder().decode([String: ManifestEntry].self, from: Data(contentsOf: manifestURL))) ?? [:]
+    for entry in manifest.values.sorted(by: { $0.sizeMB < $1.sizeMB }) {
+        let package = modelsDir.appendingPathComponent(entry.package)
+        guard FileManager.default.fileExists(atPath: package.path) else {
+            print("skipping \(entry.name): \(package.path) not found (run make -C Tools/ModelConversion)")
+            continue
+        }
+        // Compile once to a stable location, as an app bundle would ship it: the
+        // OS caches Neural Engine compilation per model location.
+        let compiled = URL(fileURLWithPath: ".bench/compiled/\(entry.name).mlmodelc")
+        if !FileManager.default.fileExists(atPath: compiled.path) {
+            let clock = ContinuousClock()
+            let start = clock.now
+            let temporary = try await CoreMLSegmenter.compile(package)
+            try FileManager.default.createDirectory(at: compiled.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.moveItem(at: temporary, to: compiled)
+            print("compiled \(entry.name) in \(Int((clock.now - start).milliseconds)) ms")
+        }
+        for units in [MLComputeUnits.cpuOnly, .cpuAndGPU, .cpuAndNeuralEngine, .all] {
+            configurations.append(BenchmarkConfiguration(engine: entry.name, compute: units.shortName, modelSizeMB: entry.sizeMB) {
+                try CoreMLSegmenter(compiledModelAt: compiled, name: entry.name, computeUnits: units, renderer: renderer)
+            })
+        }
+    }
+
+    var results: [BenchmarkResult] = []
+    for configuration in configurations {
+        let isReference = configuration.engine == "Vision" && configuration.compute == "Auto"
+        let result = await benchmark.run(configuration, reference: isReference ? nil : reference)
+        results.append(result)
+        let status = result.error.map { "error: \($0)" }
+            ?? String(format: "load %.0f ms, p50 %.1f ms, e2e %.1f ms, IoU %@", result.loadMS, result.inferenceP50MS, result.endToEndP50MS,
+                      result.meanIoUVsVision.map { String(format: "%.3f", $0) } ?? "ref")
+        print("\(configuration.engine) [\(configuration.compute)]: \(status)")
+    }
+
+    let markdown = BenchmarkReport.markdown(results, imageCount: images.count, machine: machineDescription())
+    print("\n" + markdown)
+    if let report = args.options["report"] {
+        try markdown.write(toFile: report, atomically: true, encoding: .utf8)
+        try BenchmarkReport.csv(results).write(toFile: report.replacingOccurrences(of: ".md", with: ".csv"), atomically: true, encoding: .utf8)
+        print("wrote \(report)")
+    }
+}
+
 func photoSize(_ url: URL) throws -> (Int, Int) {
     guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
           let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
@@ -284,5 +365,6 @@ case "render": try await render(args)
 case "sample": try await sample(args)
 case "batch": try await batch(args)
 case "memprobe": try await memprobe(args)
+case "segment": try await segmentBenchmark(args)
 default: fail(usage)
 }
