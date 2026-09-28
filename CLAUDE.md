@@ -52,6 +52,7 @@ Read [README.md](README.md) for the overview. The deeper docs are [docs/SPEC.md]
 6. **SwiftUI already defines `BackgroundStyle` and `ShadowStyle`.** That's why the Kit types are `Backdrop` and `ShadowSettings`. Check new public Kit type names for clashes.
 7. **Core ML:** pin compute units (`.all` measured slower). A model compiled to a new temporary path misses the OS's Neural Engine compile cache.
 8. `CIContext.createCGImage` rejects single-channel output without a color space. Render the bytes yourself (see `makeMaskImage`).
+9. **Don't present a full-screen cover while another presentation (the Photos picker, the camera) is still animating away.** It gets zero safe-area insets, so the editor's bars land under the status bar and home indicator. Await `waitForPresentationsToSettle()` in `HomeView` first. A UI test in `EditorFlowTests` guards this.
 
 ## Assets and legal
 - Never commit macOS system pictures or other third-party images. Local dev samples are named `App/Resources/Samples/local-*` and are git-ignored. Only the user's own photos become committed samples (`cleancut-bench sample <photo> --name <name>`).
