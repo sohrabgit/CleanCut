@@ -5,7 +5,11 @@
 [![CI](https://github.com/sohrabgit/CleanCut/actions/workflows/ci.yml/badge.svg)](https://github.com/sohrabgit/CleanCut/actions/workflows/ci.yml)
 ![Swift 6](https://img.shields.io/badge/Swift-6-orange) ![iOS 18+](https://img.shields.io/badge/iOS-18%2B-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)
 
-<!-- DEMO: docs/media/demo.gif is recorded with `make demo` (see "Recording the demo"). -->
+<p align="center">
+  <img src="docs/media/demo.gif" width="300" alt="Guided capture coaching a product shot (move closer, step back, more light, hold still, glare, then ready), followed by the editor's cutout, backgrounds, shadows, formats and export sheet">
+</p>
+
+<!-- Recorded in the iPhone Simulator with `make demo`; guided capture runs on its replay camera there. -->
 
 ## What this demonstrates
 

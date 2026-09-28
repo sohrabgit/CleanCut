@@ -37,7 +37,7 @@ public struct ReplayScene: Sendable {
 
     /// The demo loop: each problem in turn, then a good shot to take.
     public static let timeline: [(scenario: CaptureScenario, seconds: Double)] = [
-        (.tooFar, 3), (.cutOff, 3), (.dark, 3), (.blurry, 3), (.glare, 3), (.good, 5),
+        (.tooFar, 2.5), (.cutOff, 2.5), (.dark, 2.5), (.blurry, 2.5), (.glare, 2.5), (.good, 4),
     ]
 
     public init(size: CGSize = CGSize(width: 1080, height: 1440)) {
