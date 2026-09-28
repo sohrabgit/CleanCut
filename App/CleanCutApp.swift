@@ -18,7 +18,14 @@ struct CleanCutApp: App {
 }
 
 struct RootView: View {
+    @State private var isShowingSplash = true
+
     var body: some View {
         HomeView()
+            .overlay {
+                if isShowingSplash {
+                    SplashView { isShowingSplash = false }
+                }
+            }
     }
 }

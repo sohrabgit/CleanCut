@@ -5,6 +5,10 @@ All notable changes to CleanCut. Versions follow the milestone plan in [docs/SPE
 ## [Unreleased]
 ### Added
 - A contributor workflow for Claude Code sessions: `CLAUDE.md` (conventions, commands, hard-won gotchas), `/feature` and `/bugfix` project skills, and a PR template.
+- A launch screen: the icon's bottle on the accent teal. Its sparkles twinkle (a staggered swell and quarter turn), then the logo lifts and fades into Home. With Reduce Motion nothing moves and it only fades. It is drawn by the same script as the icon, so the two always match. Home loads underneath from the first frame; the splash stays up for 0.95 s.
+
+### Changed
+- A redesigned app icon: a product on a full-bleed teal field, traced by a dotted cut-out line, with a sparkle. The old icon put a rounded white card inside the rounded icon mask, which read as an icon inside an icon.
 
 ### Fixed
 - The Select tool now finds each product separately when U²-Netp does the cutout (always in the Simulator, or when chosen in Settings), so tapping one includes or excludes it. U²-Netp returns one mask for everything in the photo, so two products showed up as a single "Object 1", and tapping it did nothing because the last object can't be excluded. The mask is now split into its disconnected objects. The "Tap objects" hint no longer appears when there is only one object.
