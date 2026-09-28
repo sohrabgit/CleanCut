@@ -2,6 +2,13 @@
 
 All notable changes to CleanCut. Versions follow the milestone plan in [docs/SPEC.md](docs/SPEC.md).
 
+## [Unreleased]
+### Added
+- A contributor workflow for Claude Code sessions: `CLAUDE.md` (conventions, commands, hard-won gotchas), `/feature` and `/bugfix` project skills, and a PR template.
+
+### Fixed
+- Undo/redo now also updates the remembered style used for the next photo and for batch mode.
+
 ## [0.9.0] — Polish & docs (M7)
 ### Added
 - Pinch-to-zoom and pan on the studio canvas (re-renders at the magnified size), double-tap to fit, and a zoom badge.
