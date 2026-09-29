@@ -1,0 +1,134 @@
+name: CleanCut
+
+options:
+  bundleIdPrefix: dev.sohrab
+  deploymentTarget:
+    iOS: "18.0"
+    macOS: "15.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+
+configFiles:
+  Debug: Configs/Base.xcconfig
+  Release: Configs/Base.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    GCC_TREAT_WARNINGS_AS_ERRORS: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    ENABLE_MODULE_VERIFIER: YES
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "0.9.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  # Pure image pipeline: no UI, no main-actor defaults, builds for iOS and macOS
+  # so the test suite and the benchmark CLI run natively on a Mac.
+  CleanCutKit:
+    type: framework
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - path: Kit/CleanCutKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.sohrab.cleancut.kit
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+        DEFINES_MODULE: YES
+        # Metal files in this target are Core Image kernels.
+        MTL_COMPILER_FLAGS: -fcikernel
+        MTLLINKER_FLAGS: -cikernel
+        MTL_ENABLE_DEBUG_INFO: NO
+    scheme:
+      testTargets:
+        - CleanCutKitTests
+      gatherCoverageData: true
+
+  CleanCutKitTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - path: Tests/CleanCutKitTests
+    dependencies:
+      - target: CleanCutKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.sohrab.cleancut.kit.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  CleanCut:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+        excludes:
+          - Resources/Samples
+      # A folder reference keeps samples and their mask folders intact in the bundle.
+      - path: App/Resources/Samples
+        type: folder
+      # U²-Netp (Apache-2.0): fallback segmenter where Vision's instance mask
+      # can't run (the Simulator) and an opt-in engine in Settings.
+      - path: Models/U2Netp.mlpackage
+    dependencies:
+      - target: CleanCutKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.sohrab.cleancut
+        PRODUCT_NAME: CleanCut
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: YES
+        SUPPORTS_MACCATALYST: NO
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        # Models are loaded by URL; no generated wrapper classes.
+        COREML_CODEGEN_LANGUAGE: None
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: YES
+        # The launch screen dictionary can't be a build setting; it lives here.
+        INFOPLIST_FILE: App/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: CleanCut
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.photography
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_NSCameraUsageDescription: "CleanCut uses the camera so you can photograph a product and clean it up right away."
+        INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: "CleanCut saves your finished product photos to your library."
+    scheme:
+      testTargets:
+        - CleanCutKitTests
+        - CleanCutUITests
+
+  # Drives the app end to end in the Simulator; also captures screenshots.
+  CleanCutUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: CleanCut
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.sohrab.cleancut.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: CleanCut
+
+  # macOS command-line tool for segmentation benchmarks and batch memory runs.
+  cleancut-bench:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Tools/bench
+    dependencies:
+      - target: CleanCutKit
+    settings:
+      base:
+        PRODUCT_NAME: cleancut-bench
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path @executable_path/../Frameworks"
+        CODE_SIGN_IDENTITY: "-"
+    scheme: {}

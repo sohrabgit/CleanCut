@@ -1,0 +1,17 @@
+engine,compute,size_mb,load_ms,reload_ms,first_run_ms,inference_p50_ms,inference_p90_ms,e2e_p50_ms,iou_vs_vision,peak_mem_mb,failures,error
+Vision,Auto,,0.00,0.00,15.24,14.98,15.54,14.98,,12.7,0,
+Vision,ANE,,0.00,0.00,14.99,14.98,15.44,14.98,1.0000,14.4,0,
+Vision,GPU,,0.00,0.00,106.85,16.50,16.93,16.50,0.9999,159.1,0,
+Vision,CPU,,0.00,0.00,0.00,0.00,0.00,0.00,,0.0,0,failed("unsupportedComputeDevice(\"Error Domain=com.apple.Vision Code=22 \\\"unsupported compute device <MLCPUComputeDevice: 0x7c4dac080>\\\" UserInfo={NSLocalizedDescription=unsupported compute device <MLCPUComputeDevice: 0x7c4dac080>}\")")
+U2Netp,CPU,2.4,20.99,19.40,26.69,16.88,17.12,21.61,0.9582,76.0,0,
+U2Netp,CPU+GPU,2.4,23.58,21.80,34.51,5.24,5.69,8.02,0.9579,87.7,0,
+U2Netp,CPU+ANE,2.4,24.72,22.89,9.33,4.65,4.75,7.90,0.9580,25.1,0,
+U2Netp,All,2.4,27.69,25.78,21.50,7.52,7.81,10.59,0.9580,68.1,0,
+ISNet-6bit,CPU,31.8,22.96,21.85,125.84,102.94,104.74,107.09,0.9548,188.6,0,
+ISNet-6bit,CPU+GPU,31.8,27.52,26.29,286.57,26.46,26.54,29.44,0.9548,624.0,0,
+ISNet-6bit,CPU+ANE,31.8,50.40,28.62,31.11,24.19,24.30,28.58,0.9548,90.7,0,
+ISNet-6bit,All,31.8,33.27,30.30,55.62,37.49,38.32,42.05,0.9548,220.5,0,
+ISNet,CPU,84.2,19.43,18.62,125.43,102.90,104.19,106.98,0.9557,239.8,0,
+ISNet,CPU+GPU,84.2,28.80,26.64,57.76,26.46,26.53,29.38,0.9557,246.2,0,
+ISNet,CPU+ANE,84.2,49.09,27.45,33.10,25.06,25.27,29.56,0.9556,86.7,0,
+ISNet,All,84.2,32.29,29.69,57.54,38.71,39.17,43.18,0.9557,222.9,0,

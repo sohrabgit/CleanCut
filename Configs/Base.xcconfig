@@ -1,0 +1,3 @@
+// Shared build settings. Per-developer overrides (e.g. DEVELOPMENT_TEAM) go in
+// Configs/Local.xcconfig, which is git-ignored. Copy Local.xcconfig.example to start.
+#include? "Local.xcconfig"

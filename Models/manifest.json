@@ -1,0 +1,29 @@
+{
+  "U2Netp": {
+    "name": "U2Netp",
+    "package": "U2Netp.mlpackage",
+    "inputSize": 320,
+    "sizeMB": 2.4,
+    "license": "Apache-2.0",
+    "source": "https://raw.githubusercontent.com/xuebinqin/U-2-Net/ac7e1c817ecab7c7dff5ce6b1abba61cd213ff29/model/u2net.py",
+    "weightsSHA256": "e7567cde013fb64813973ce6e1ecc25a80c05c3ca7adbc5a54f3c3d90991b854"
+  },
+  "ISNet": {
+    "name": "ISNet",
+    "package": "ISNet.mlpackage",
+    "inputSize": 1024,
+    "sizeMB": 84.2,
+    "license": "Apache-2.0",
+    "source": "https://raw.githubusercontent.com/xuebinqin/DIS/b6764e20381f6f42a70f83fa3324181529ed1403/IS-Net/models/isnet.py",
+    "weightsSHA256": "9e1aafea58f0b55d0c35077e0ceade6ba1ba2bce372fd4f8f77215391f3fac13"
+  },
+  "ISNet-6bit": {
+    "name": "ISNet-6bit",
+    "package": "ISNet-6bit.mlpackage",
+    "inputSize": 1024,
+    "sizeMB": 31.8,
+    "license": "Apache-2.0",
+    "source": "https://raw.githubusercontent.com/xuebinqin/DIS/b6764e20381f6f42a70f83fa3324181529ed1403/IS-Net/models/isnet.py",
+    "weightsSHA256": "9e1aafea58f0b55d0c35077e0ceade6ba1ba2bce372fd4f8f77215391f3fac13"
+  }
+}

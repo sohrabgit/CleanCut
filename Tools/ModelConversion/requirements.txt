@@ -1,0 +1,9 @@
+# Pinned for reproducible conversion (coremltools 9.0 is tested up to torch 2.7).
+coremltools==9.0
+torch==2.7.0
+torchvision==0.22.0
+numpy==2.5.3
+pillow==12.3.0
+scikit-learn==1.9.1
+gdown==6.4.0
+huggingface-hub==2.0.0
