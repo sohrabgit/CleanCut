@@ -202,7 +202,7 @@ func batch(_ args: Arguments) async throws {
             |---|---|---|---|---|---|
             \(rows.joined(separator: "\n"))
 
-            \(urls.count) photos at \(width)×\(height), decoded to ≤ 3072 px, exported as \(presets.map(\.name).joined(separator: " + ")). \(machineDescription()).
+            \(urls.count) photos at \(width)×\(height), decoded to ≤ 3072 px, exported as \(presets.map(\.name).joined(separator: " + ")). \(BenchmarkMachine.description).
 
             """
         try markdown.write(toFile: report, atomically: true, encoding: .utf8)
@@ -275,14 +275,7 @@ func segmentBenchmark(_ args: Arguments) async throws {
     print("\(images.count) photos with a detectable product")
     let benchmark = SegmentationBenchmark(images: images, measuredRuns: runs)
 
-    var configurations: [BenchmarkConfiguration] = [
-        BenchmarkConfiguration(engine: "Vision", compute: "Auto", modelSizeMB: nil, loadsLazily: true) { VisionSegmenter() },
-    ]
-    for device in VisionSegmenter.supportedComputeDevices {
-        configurations.append(BenchmarkConfiguration(engine: "Vision", compute: device.shortName, modelSizeMB: nil, loadsLazily: true) {
-            VisionSegmenter(computeDevice: device)
-        })
-    }
+    var configurations = BenchmarkConfiguration.vision
 
     struct ManifestEntry: Decodable { let name: String; let package: String; let sizeMB: Double }
     let manifestURL = modelsDir.appendingPathComponent("manifest.json")
@@ -304,17 +297,12 @@ func segmentBenchmark(_ args: Arguments) async throws {
             try FileManager.default.moveItem(at: temporary, to: compiled)
             print("compiled \(entry.name) in \(Int((clock.now - start).milliseconds)) ms")
         }
-        for units in [MLComputeUnits.cpuOnly, .cpuAndGPU, .cpuAndNeuralEngine, .all] {
-            configurations.append(BenchmarkConfiguration(engine: entry.name, compute: units.shortName, modelSizeMB: entry.sizeMB) {
-                try CoreMLSegmenter(compiledModelAt: compiled, name: entry.name, computeUnits: units, renderer: renderer)
-            })
-        }
+        configurations += BenchmarkConfiguration.coreML(compiledModelAt: compiled, name: entry.name, sizeMB: entry.sizeMB, renderer: renderer)
     }
 
     var results: [BenchmarkResult] = []
     for configuration in configurations {
-        let isReference = configuration.engine == "Vision" && configuration.compute == "Auto"
-        let result = await benchmark.run(configuration, reference: isReference ? nil : reference)
+        let result = await benchmark.run(configuration, reference: configuration.isReference ? nil : reference)
         results.append(result)
         let status = result.error.map { "error: \($0)" }
             ?? String(format: "load %.0f ms, p50 %.1f ms, e2e %.1f ms, IoU %@", result.loadMS, result.inferenceP50MS, result.endToEndP50MS,
@@ -322,7 +310,7 @@ func segmentBenchmark(_ args: Arguments) async throws {
         print("\(configuration.engine) [\(configuration.compute)]: \(status)")
     }
 
-    let markdown = BenchmarkReport.markdown(results, imageCount: images.count, machine: machineDescription())
+    let markdown = BenchmarkReport.markdown(results, imageCount: images.count, machine: BenchmarkMachine.description)
     print("\n" + markdown)
     if let report = args.options["report"] {
         try markdown.write(toFile: report, atomically: true, encoding: .utf8)
@@ -340,55 +328,24 @@ func previewBenchmark(_ args: Arguments) async throws {
     guard dims.count == 2 else { fail("bad --size") }
     let frames = Int(args.options["frames"] ?? "120") ?? 120
     let renderer = RenderService()
-    guard let device = renderer.device, let queue = renderer.commandQueue else { fail("needs a Metal GPU") }
+    guard renderer.device != nil else { fail("needs a Metal GPU") }
 
     let image = try ImageLoader.load(url: URL(fileURLWithPath: path))
     let photo = try await PreparedPhoto.prepare(image, segmenter: VisionSegmenter(), renderer: renderer)
     guard let inputs = photo.previewInputs(selection: nil) else { fail("no subject") }
 
-    let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: dims[0], height: dims[1], mipmapped: false)
-    descriptor.usage = [.shaderWrite, .shaderRead, .renderTarget]
-    descriptor.storageMode = .private
-    guard let texture = device.makeTexture(descriptor: descriptor) else { fail("texture") }
     let size = CGSize(width: dims[0], height: dims[1])
-
-    let scenarios: [(String, (inout Recipe, Int) -> Void)] = [
-        ("Redraw, nothing changed", { _, _ in }),
-        ("Drag shadow intensity", { recipe, i in recipe.shadow.intensity = 0.2 + 0.6 * Double(i % 60) / 60 }),
-        ("Drag edge-clean strength (re-runs kernel)", { recipe, i in recipe.edges.cleanStrength = 0.2 + 0.8 * Double(i % 60) / 60 }),
-        ("Switch backgrounds", { recipe, i in recipe.background = i.isMultiple(of: 2) ? .solid(.white) : .studioSweep(RGBA(hex: 0xEDEBE8)) }),
-        // Worst case: a new matte invalidates the kernel, cutout and shadows.
-        ("Drag edge softness (recomputes everything)", { recipe, i in recipe.edges.feather = 0.001 + 0.015 * Double(i % 60) / 60 }),
-    ]
+    let benchmark = PreviewBenchmark(inputs: inputs, size: size, frames: frames)
 
     print("\(image.width)×\(image.height) photo, proxy \(Int(inputs.source.extent.width))×\(Int(inputs.source.extent.height)), frames \(dims[0])×\(dims[1])")
-    var rows = ["| Scenario | GPU p50 | GPU p90 | Frame p50 (CPU+GPU) | Frame p90 |", "|---|---|---|---|---|"]
-    for (name, mutate) in scenarios {
-        var recipe = Recipe.default
-        var gpu: [Double] = [], total: [Double] = []
-        for i in 0..<(frames + 10) {
-            mutate(&recipe, i)
-            let clock = ContinuousClock()
-            let start = clock.now
-            guard let buffer = queue.makeCommandBuffer() else { continue }
-            let destination = CIRenderDestination(width: dims[0], height: dims[1], pixelFormat: .bgra8Unorm, commandBuffer: buffer) { texture }
-            destination.colorSpace = ColorSpaces.sRGB
-            let frame = Pipeline.makeImage(inputs, recipe: recipe, outputSize: size)
-            _ = try renderer.context.startTask(toRender: frame, to: destination)
-            buffer.commit()
-            await buffer.completed()
-            guard i >= 10 else { continue } // warm-up
-            gpu.append((buffer.gpuEndTime - buffer.gpuStartTime) * 1000)
-            total.append((clock.now - start).milliseconds)
-        }
-        let row = String(format: "| %@ | %.2f ms | %.2f ms | %.2f ms | %.2f ms |", name,
-                         SegmentationBenchmark.percentile(gpu, 0.5), SegmentationBenchmark.percentile(gpu, 0.9),
-                         SegmentationBenchmark.percentile(total, 0.5), SegmentationBenchmark.percentile(total, 0.9))
+    var rows: [PreviewBenchmark.Row] = []
+    for scenario in PreviewBenchmark.scenarios {
+        let row = try await benchmark.run(scenario, renderer: renderer)
         rows.append(row)
-        print(row)
+        print(String(format: "%@: GPU p50 %.2f ms, frame p50 %.2f ms, p90 %.2f ms", row.scenario, row.gpuP50MS, row.frameP50MS, row.frameP90MS))
     }
     if let report = args.options["report"] {
-        let markdown = rows.joined(separator: "\n") + "\n\n\(frames) frames per scenario at \(dims[0])×\(dims[1]) (iPhone 17 Pro width @3×), after 10 warm-up frames. \(machineDescription()).\n"
+        let markdown = PreviewBenchmark.markdown(rows) + "\n\(frames) frames per scenario at \(dims[0])×\(dims[1]) (iPhone 17 Pro width @3×), after 10 warm-up frames. \(BenchmarkMachine.description).\n"
         try markdown.write(toFile: report, atomically: true, encoding: .utf8)
     }
 }
@@ -404,16 +361,6 @@ func photoSize(_ url: URL) throws -> (Int, Int) {
 
 func megabytes(_ bytes: UInt64) -> String {
     String(format: "%.0f MB", Double(bytes) / 1_048_576)
-}
-
-func machineDescription() -> String {
-    var size = 0
-    sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0)
-    var buffer = [CChar](repeating: 0, count: size)
-    sysctlbyname("machdep.cpu.brand_string", &buffer, &size, nil, 0)
-    let chip = String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
-    let os = ProcessInfo.processInfo.operatingSystemVersionString.replacingOccurrences(of: "Version ", with: "")
-    return "\(chip), macOS \(os)"
 }
 
 extension Duration {

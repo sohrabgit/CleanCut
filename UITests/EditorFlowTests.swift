@@ -124,6 +124,22 @@ final class EditorFlowTests: XCTestCase {
         snapshot(app, "08-batch-empty")
     }
 
+    /// Settings › Benchmarks runs every harness end to end and offers the
+    /// report. In the Simulator, Vision's rows report "Unsupported".
+    @MainActor
+    func testBenchmarksRunAndOfferTheReport() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-resetState"]
+        app.launch()
+        app.buttons["Settings"].tap()
+        app.buttons["Benchmarks"].tap()
+        snapshot(app, "13-benchmarks")
+
+        app.buttons["Run Benchmarks"].tap()
+        XCTAssertTrue(app.buttons["Share Report"].waitForExistence(timeout: 300), "The run should finish with a report")
+        snapshot(app, "14-benchmarks-results")
+    }
+
     /// Guided capture with the replay camera: a staged problem shows its tip,
     /// a good shot turns ready, and the shutter opens the editor, inside the
     /// safe area (the capture cover has to be gone first).
