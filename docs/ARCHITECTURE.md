@@ -67,7 +67,7 @@ flowchart LR
 ```
 
 1. **Framing first.** `Framing.canvasRect` picks the smallest canvas with the preset's aspect ratio in which the subject fills exactly `fill` of the width or height. Source and mask are resampled straight into output space. From here on, everything costs *output* pixels, not camera pixels. A 48 MP photo exported at 2000 px never blurs 48 MP.
-2. **Relative units.** Every length in a `Recipe` is a fraction of the subject's short side (`unit`). The same recipe therefore produces the same look at 320 px and at 2000 px, and a parity test proves it.
+2. **Relative units.** Every length in a `Recipe` is a fraction of the subject's short side (`unit`). The same recipe therefore produces the same look at 320 px and at 1280 px, and a parity test (`previewAndExportLookTheSame`, PSNR > 32 dB) checks it.
 3. **Edge decontamination** (`EdgeDecontamination.metal`). Soft edge pixels are a mix of product and old backdrop: `I = αF + (1−α)B`. The kernel estimates the local backdrop color `B` from a blur of the background-only pixels, weighted by `(1−α)⁴` so that half-mixed pixels don't pollute the estimate. It then solves for `F`. Interior pixels (α = 1) are unchanged by construction.
 4. **Shadows** come from the matte. The drop shadow is the silhouette, offset along the light direction and blurred. The contact shadow is the bottom 12% of the silhouette, flattened onto the floor plane, as a tight core plus a wider ambient falloff.
 5. **Backdrop.** Solid colors are exact sRGB, so the Amazon preset's white is exactly 255. The studio sweep is a vertical gradient plus a soft vignette. Transparent renders to PNG.

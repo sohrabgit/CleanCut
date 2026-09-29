@@ -49,7 +49,7 @@ Recipe (Codable value) ──► Pipeline.makeImage ◄────────�
 ```
 
 - **A `Recipe` is a value.** Undo is a stack of values, batch mode applies one recipe to 50 photos, and the last style is remembered as JSON.
-- **Every length in the recipe is relative to the subject.** So the 320 px preview and the 2000 px export look identical: *PSNR > 32 dB* in `previewAndExportLookTheSame`.
+- **Every length in the recipe is relative to the subject.** So a 320 px preview and a 1280 px export (rendered from 4× the pixels, then scaled down to compare) match at *PSNR > 32 dB* in `previewAndExportLookTheSame`.
 - **Masks are treated as data, not color**: they're never color-managed. That, plus exact sRGB output, is why Amazon's white measures exactly `(255, 255, 255)`, and the tests check it.
 
 Details: [ARCHITECTURE.md](docs/ARCHITECTURE.md) · trade-offs: [DECISIONS.md](docs/DECISIONS.md) · product and UX spec: [SPEC.md](docs/SPEC.md).
