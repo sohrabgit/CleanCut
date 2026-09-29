@@ -29,7 +29,7 @@ flowchart LR
         Render["RenderService<br/>Metal-backed CIContext"]
         Exporter
         BatchP["BatchProcessor<br/>bounded TaskGroup"]
-        Bench["SegmentationBenchmark"]
+        Bench["Segmentation / Preview / Capture benchmarks"]
         Analyzer["FrameAnalyzer + CaptureCoach<br/>CIKernels + CIAreaAverage"]
     end
 
@@ -80,7 +80,7 @@ flowchart LR
 - `CanvasView` wraps an `MTKView` (`framebufferOnly = false`) and `PreviewRenderer` draws through `CIRenderDestination` with the shared Metal command queue.
 - It redraws **on demand** (`enableSetNeedsDisplay`) when the `CanvasScene` value changes. It runs a display link only while something animates: the lift reveal, or the selection glow in Select mode. The cutout goes through `insertingIntermediate(cache: true)`, so background and format changes don't re-run the kernel.
 - Zooming re-renders the pipeline at the magnified size, and Core Image only evaluates what lands in the drawable. Tap-to-select hit-tests with the same `CanvasLayout` math the renderer uses.
-- `OSSignposter` intervals and a debug HUD (GPU/CPU ms per frame) are on the canvas.
+- `OSSignposter` intervals and a debug HUD (GPU/CPU ms per frame) are on the canvas. `PreviewBenchmark` times the same kind of frames offline, from the CLI on a Mac and from Settings › Benchmarks on a device.
 
 ## Guided capture
 
