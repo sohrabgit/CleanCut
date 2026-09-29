@@ -4,6 +4,7 @@ All notable changes to CleanCut. Versions follow the milestone plan in [docs/SPE
 
 ## [Unreleased]
 ### Added
+- Settings › Benchmarks measures this device: Vision and U²-Netp across compute units, live-preview frame times at the screen's width, and guided capture's per-frame analysis cost. It shares the report as Markdown and CSV, and `-runLab` runs it at launch so a Mac can collect the report with `devicectl`. The Mac CLI and the app now share the harnesses in `CleanCutKit/Bench`. BENCHMARKS.md and the README have a table for an iPhone SE (2nd generation, A13).
 - Guided capture: Take Photo opens a live camera that coaches before the shutter. It checks framing (the product is found, whole and big enough), light, sharpness and glare on every frame, shows one steady tip and a four-item checklist, and turns the shutter ring teal with a haptic when the shot is ready. It never blocks the shutter. In the Simulator a staged scene plays instead of a camera, cycling through every tip.
 - A contributor workflow for Claude Code sessions: `CLAUDE.md` (conventions, commands, hard-won gotchas), `/feature` and `/bugfix` project skills, and a PR template.
 - A launch screen: the icon's bottle on the accent teal. Its sparkles twinkle (a staggered swell and quarter turn), then the logo lifts and fades into Home. With Reduce Motion nothing moves and it only fades. It is drawn by the same script as the icon, so the two always match. Home loads underneath from the first frame; the splash stays up for 0.95 s.

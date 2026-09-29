@@ -16,13 +16,13 @@
 | | |
 |---|---|
 | **Core Image** | A pure pipeline `Pipeline.makeImage(inputs, recipe, size) → CIImage`: framing in output space, feathering, drop and contact shadows built from the mask, studio backdrops. Tests prove the preview and the export match. → [`Pipeline/`](Kit/CleanCutKit/Pipeline) |
-| **Metal** | A custom `CIColorKernel` that removes backdrop color from soft edges by solving the compositing equation. The live preview is an `MTKView` drawn through a Metal-backed `CIContext`, measured at ≤ 5 ms per 1206² frame in the worst case (60 Hz budget: 16.7 ms). → [`EdgeDecontamination.metal`](Kit/CleanCutKit/Kernels/EdgeDecontamination.metal), [`CanvasView.swift`](App/Features/Editor/CanvasView.swift) |
+| **Metal** | A custom `CIColorKernel` that removes backdrop color from soft edges by solving the compositing equation. The live preview is an `MTKView` drawn through a Metal-backed `CIContext`, measured in the worst case at ≤ 5 ms per 1206² frame on an M4 Max and 15.6 ms (p90) per 750² frame on an iPhone SE (A13); the 60 Hz budget is 16.7 ms. → [`EdgeDecontamination.metal`](Kit/CleanCutKit/Kernels/EdgeDecontamination.metal), [`CanvasView.swift`](App/Features/Editor/CanvasView.swift) |
 | **Vision & Core ML** | Vision foreground *instance* masks with tap-to-select. Open-source models (U²-Netp, ISNet; Apache-2.0) are converted reproducibly and benchmarked across CPU / GPU / Neural Engine. → [BENCHMARKS.md](docs/BENCHMARKS.md) |
 | **Swift concurrency** | Swift 6 strict concurrency with warnings as errors. The app is `MainActor` by default and heavy work runs `@concurrent`. Batch mode is a bounded sliding-window `TaskGroup` streaming progress as an `AsyncStream`. The camera is an actor on its own capture queue. → [`BatchProcessor.swift`](Kit/CleanCutKit/Batch/BatchProcessor.swift), [`CameraEngine.swift`](App/Features/Capture/CameraEngine.swift) |
 | **AVFoundation & real-time analysis** | Guided capture checks every frame before the shutter: two custom Core Image kernels (a Laplacian for sharpness, a tone pass for clipping and glare) weighted by a live U²-Netp subject mask, reduced on the GPU to eight floats per frame, with a coach that holds each verdict before changing a tip. A generated replay scene stands in for the camera in the Simulator, and tests stage every tip through the real analyzer. → [`Capture/`](Kit/CleanCutKit/Capture), [DECISIONS 010](docs/DECISIONS.md) |
 | **Performance work** | I measured and fixed batch memory: a long-lived `CIContext` peaked at 2.9 GB, a context per photo stays flat at ~0.9 GB. ImageIO downsamples during decode, and the preview runs on cached proxies. → [DECISIONS 006](docs/DECISIONS.md) |
 | **Product & UX** | A clean, native UI: the photo is the hero and there's one primary action per screen. Every change is live and can be undone. Haptics, VoiceOver, Dynamic Type, Dark Mode, and an iPad/Mac inspector layout. → [SPEC.md](docs/SPEC.md#uiux) |
-| **Testing** | 91 Swift Testing tests that run natively on macOS in ~3 s and on the iOS Simulator, a UI flow test that exports screenshots, and CI. |
+| **Testing** | 98 Swift Testing tests that run natively on macOS in ~3 s and on the iOS Simulator, a UI flow test that exports screenshots, and CI. |
 
 ## Features
 
@@ -54,7 +54,19 @@ Recipe (Codable value) ──► Pipeline.makeImage ◄────────�
 
 Details: [ARCHITECTURE.md](docs/ARCHITECTURE.md) · trade-offs: [DECISIONS.md](docs/DECISIONS.md) · product and UX spec: [SPEC.md](docs/SPEC.md).
 
-## Benchmarks (Apple M4 Max, macOS 26)
+## Benchmarks
+
+**On an iPhone SE (2nd generation, A13 Bionic, iOS 26.6.2)**, measured in the app (Settings › Benchmarks):
+
+| | p50 | p90 |
+|---|---|---|
+| Vision instance mask (automatic placement) | **53.6 ms** | 54.6 ms |
+| U²-Netp on CPU + Neural Engine (`.all`: 35.8 ms) | **22.1 ms** | 24.2 ms |
+| Preview frame, ordinary edit (750², 60 Hz budget 16.7 ms) | 2.6–8.4 ms | 3.1–8.6 ms |
+| Preview frame, worst case (everything recomputes) | 14.5 ms | 15.6 ms |
+| Guided capture analysis per frame (15 fps budget 66.7 ms) | **13.0 ms** (mean 22.5 ms) | 44.9 ms |
+
+**On an Apple M4 Max (macOS 26)**, measured with the `cleancut-bench` CLI:
 
 | Engine | Best compute units | Size | Inference p50 | CPU only | `.all` | IoU vs Vision |
 |---|---|---|---|---|---|---|
@@ -68,9 +80,9 @@ What stood out:
 - 6-bit palettization makes the file 2.6× smaller at no measurable cost.
 - The first Neural Engine load of ISNet compiles on device for 8–9 s. The OS then caches it by model location, and later loads take about 30 ms.
 
-Full table, method and caveats: [BENCHMARKS.md](docs/BENCHMARKS.md). iPhone numbers are still to come; the harness is in the framework.
+Full tables, method and caveats: [BENCHMARKS.md](docs/BENCHMARKS.md). The Mac CLI and the in-app screen run the same harnesses from `CleanCutKit/Bench`.
 
-**Preview:** 0.5 ms per frame for a redraw, 1.5–1.9 ms while dragging a shadow or edge slider, and 4.2 ms (p90 5.1 ms) in the worst case where everything recomputes. Measured at 1206×1206.
+**Preview (M4 Max):** 0.5 ms per frame for a redraw, 1.5–1.9 ms while dragging a shadow or edge slider, and 4.2 ms (p90 5.1 ms) in the worst case where everything recomputes. Measured at 1206×1206.
 
 **Batch:** 50 × 12 MP photos take 1.8 s with 4 workers. Peak footprint is 0.87 GB with 1 worker and 1.4 GB with 4, and the footprint between photos stays flat.
 
@@ -111,10 +123,10 @@ docs/                    SPEC, ARCHITECTURE, DECISIONS, BENCHMARKS
 
 ## What I'd do next
 
-- **iPhone numbers.** Add an in-app "Lab" screen on top of `SegmentationBenchmark`, and publish a benchmark table per chip.
+- **More chips.** Run Settings › Benchmarks on a recent iPhone (A17/A18) next to the A13, and cut the worst-case preview frame on older phones (a lower-resolution matte while a slider moves).
 - **Prewarm the model.** Load the Core ML model in the background on first launch to absorb the one-time Neural Engine compile.
 - **Better matting.** Guided-filter refinement of the Core ML masks (they're upsampled from 320²), and a multi-level foreground estimate for the edge kernel.
-- **Tune guided capture on real photos.** Measure its per-frame cost on an iPhone, and calibrate the thresholds on a labeled set of real product shots instead of generated scenes.
+- **Tune guided capture on real photos.** Calibrate the thresholds on a labeled set of real product shots instead of generated scenes. Its per-frame cost on an iPhone SE is measured (22.5 ms mean at a 66.7 ms budget).
 - **Fidelity check.** OCR before and after to flag product labels the mask clipped.
 - **Templates.** Share `Recipe` JSON between sellers ("shop style").
 

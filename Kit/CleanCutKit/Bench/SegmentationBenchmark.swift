@@ -26,6 +26,34 @@ public struct BenchmarkConfiguration: Sendable {
     }
 }
 
+extension BenchmarkConfiguration {
+    /// Vision with automatic placement (the reference for agreement), then
+    /// pinned to each compute device it supports here.
+    public static var vision: [BenchmarkConfiguration] {
+        var configurations = [BenchmarkConfiguration(engine: "Vision", compute: "Auto", modelSizeMB: nil, loadsLazily: true) { VisionSegmenter() }]
+        for device in VisionSegmenter.supportedComputeDevices {
+            configurations.append(BenchmarkConfiguration(engine: "Vision", compute: device.shortName, modelSizeMB: nil, loadsLazily: true) {
+                VisionSegmenter(computeDevice: device)
+            })
+        }
+        return configurations
+    }
+
+    /// A compiled model on each set of compute units. Pass a stable location
+    /// (the app bundle, or a cache): the OS keys its Neural Engine compile
+    /// cache on it.
+    public static func coreML(compiledModelAt url: URL, name: String, sizeMB: Double?, renderer: RenderService) -> [BenchmarkConfiguration] {
+        [MLComputeUnits.cpuOnly, .cpuAndGPU, .cpuAndNeuralEngine, .all].map { units in
+            BenchmarkConfiguration(engine: name, compute: units.shortName, modelSizeMB: sizeMB) {
+                try CoreMLSegmenter(compiledModelAt: url, name: name, computeUnits: units, renderer: renderer)
+            }
+        }
+    }
+
+    /// Vision's automatic configuration: every other row is compared with it.
+    public var isReference: Bool { engine == "Vision" && compute == "Auto" }
+}
+
 public struct BenchmarkResult: Sendable, Codable {
     public var engine: String
     public var compute: String

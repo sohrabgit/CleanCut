@@ -24,7 +24,7 @@ OCR fidelity checks, generative backgrounds, manual brush mask editing, accounts
 | Framing | Automatic crop and centering around the subject, with a fill ratio set per preset |
 | Export | Formats below. Full-quality render only on export. Save to Photos (add-only permission, requested at save time) or Share |
 | Batch | Up to 50 photos, the current style applied to all of them, bounded concurrency, a live progress grid, cancel, and per-item retry |
-| Benchmark | Vision vs Core ML (U²-Netp, ISNet fp16 / 6-bit palettized) across compute units, run from a macOS CLI |
+| Benchmark | Vision vs Core ML (U²-Netp, ISNet fp16 / 6-bit palettized) across compute units, run from a macOS CLI; segmentation, preview frame time and guided-capture analysis on the device from Settings › Benchmarks |
 
 ### Export presets
 Defined in one table: [`ExportPreset.swift`](../Kit/CleanCutKit/Recipe/ExportPreset.swift). Marketplaces update their photo guidance, so **check the current rules before relying on these numbers**.
@@ -66,7 +66,7 @@ Defined in one table: [`ExportPreset.swift`](../Kit/CleanCutKit/Recipe/ExportPre
    - On iPad and Mac (regular width), the tools move into a right-hand inspector.
 4. **Export sheet**: a card per preset with a live thumbnail and the exact pixel size. Pick several, then **Save to Photos** or Share; a checkmark and a success haptic confirm.
 5. **Batch**: pick photos, confirm the style and formats, then watch the grid fill in (a progress ring per tile, Cancel, Retry on failed tiles). Finish with "Save all" or Share.
-6. **Settings**: segmentation engine (Vision / U²-Net, experimental), a debug HUD (frame time), licenses.
+6. **Settings**: segmentation engine (Vision / U²-Net, experimental), a debug HUD (frame time), Benchmarks (runs the Kit's harnesses on this device and shares a Markdown + CSV report), licenses.
 
 Error messages are written for people, e.g. "No product found — try a photo with a clear subject", never raw error text.
 
