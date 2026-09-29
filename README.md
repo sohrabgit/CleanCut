@@ -49,7 +49,7 @@ Recipe (Codable value) ──► Pipeline.makeImage ◄────────�
 ```
 
 - **A `Recipe` is a value.** Undo is a stack of values, batch mode applies one recipe to 50 photos, and the last style is remembered as JSON.
-- **Every length in the recipe is relative to the subject.** So the 320 px preview and the 2000 px export look identical: *PSNR > 32 dB* in `previewAndExportLookTheSame`.
+- **Every length in the recipe is relative to the subject.** So a 320 px preview and a 1280 px export (rendered from 4× the pixels, then scaled down to compare) match at *PSNR > 32 dB* in `previewAndExportLookTheSame`.
 - **Masks are treated as data, not color**: they're never color-managed. That, plus exact sRGB output, is why Amazon's white measures exactly `(255, 255, 255)`, and the tests check it.
 
 Details: [ARCHITECTURE.md](docs/ARCHITECTURE.md) · trade-offs: [DECISIONS.md](docs/DECISIONS.md) · product and UX spec: [SPEC.md](docs/SPEC.md).
@@ -120,6 +120,16 @@ Tools/ModelConversion/   PyTorch → Core ML conversion (U²-Netp, ISNet)
 Models/                  U2Netp.mlpackage (+ generated ISNet variants, git-ignored)
 docs/                    SPEC, ARCHITECTURE, DECISIONS, BENCHMARKS
 ```
+
+## How I built this
+
+I built CleanCut with [Claude Code](https://claude.com/claude-code) as a pair programmer, and most commits carry its `Co-Authored-By` trailer. I set the product scope, the architecture and the trade-offs, and reviewed each plan before any code was written. Claude wrote most of the code, tests and first drafts of the docs, and ran the tools. [`CLAUDE.md`](CLAUDE.md) and the [`/feature`](.claude/skills/feature/SKILL.md) and [`/bugfix`](.claude/skills/bugfix/SKILL.md) skills are that working agreement, kept in the repo on purpose: conventions, commands, and the "hard-won gotchas", each one a real bug I don't want back.
+
+Nothing went in on the AI's word:
+- **Tests.** 98 Swift Testing tests run on every change, and CI treats warnings as errors. The properties that matter are tests rather than claims: preview/export parity, Amazon's exact white, and the edge kernel's error reduction. Bugs are fixed test-first.
+- **Benchmarks.** Every number in these docs comes from a harness in the repo (`cleancut-bench` on the Mac, Settings › Benchmarks on an iPhone), with the raw data in [`docs/benchmarks`](docs/benchmarks).
+- **Decision records.** Each non-obvious choice is written down with its cost in [DECISIONS.md](docs/DECISIONS.md), backed by a measurement where there is one.
+- **Screenshots.** A UI flow test exports screenshots (`make screenshots`), and I looked at them after every UI change.
 
 ## What I'd do next
 

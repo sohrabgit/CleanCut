@@ -14,7 +14,7 @@ Short architecture decision records: what was decided, why, and what it costs.
 
 ## 003 — A Recipe is a value, and every length in it is relative
 **Decision.** `Recipe` is a `Codable & Hashable & Sendable` struct. Shadow distance, blur and feather are stored as fractions of the subject's short side, never in pixels.
-**Why.** (1) Undo/redo is a stack of values ([`History`](../Kit/CleanCutKit/Recipe/History.swift)). (2) Batch mode applies one recipe to 50 photos of different sizes. (3) The 1600 px preview and the 4000 px export look the same, and a parity test checks it.
+**Why.** (1) Undo/redo is a stack of values ([`History`](../Kit/CleanCutKit/Recipe/History.swift)). (2) Batch mode applies one recipe to 50 photos of different sizes. (3) A 320 px preview and a 1280 px export look the same: `previewAndExportLookTheSame` checks it at PSNR > 32 dB.
 **Cost.** Every stage has to convert relative units to pixels, in one place.
 
 ## 004 — Render in output space
