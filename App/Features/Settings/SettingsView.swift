@@ -29,10 +29,11 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Show frame timing", isOn: $showHUD)
+                    NavigationLink("Benchmarks") { LabView() }
                 } header: {
                     Text("Developer")
                 } footer: {
-                    Text("Overlays GPU and CPU time per preview frame on the editor canvas.")
+                    Text("Frame timing overlays GPU and CPU time per frame on the editor canvas and the camera. Benchmarks measures this device.")
                 }
 
                 Section("About") {

@@ -21,6 +21,15 @@ struct RootView: View {
     @State private var isShowingSplash = true
 
     var body: some View {
+        if LabModel.runsOnLaunch {
+            // `-runLab`: straight to the benchmarks, which start on their own.
+            NavigationStack { LabView() }
+        } else {
+            home
+        }
+    }
+
+    private var home: some View {
         HomeView()
             .overlay {
                 if isShowingSplash {
