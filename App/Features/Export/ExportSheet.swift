@@ -1,5 +1,4 @@
 import CleanCutKit
-import Photos
 import SwiftUI
 
 struct ExportSheet: View {
@@ -180,16 +179,12 @@ struct ExportSheet: View {
 
     private func save() async {
         do {
-            guard await PHPhotoLibrary.requestAuthorization(for: .addOnly) == .authorized else {
+            guard await PhotoLibrary.requestAddAccess() else {
                 status = .failed("Allow CleanCut to add photos in Settings to save your exports.")
                 return
             }
             let urls = try await renderFiles()
-            try await PHPhotoLibrary.shared().performChanges {
-                for url in urls {
-                    PHAssetCreationRequest.forAsset().addResource(with: .photo, fileURL: url, options: nil)
-                }
-            }
+            try await PhotoLibrary.save(urls)
             withAnimation(Tokens.Motion.spring) { status = .saved(count: urls.count) }
         } catch {
             status = .failed(FriendlyError.message(for: error))

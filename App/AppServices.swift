@@ -1,5 +1,6 @@
 import CleanCutKit
 import Foundation
+import Photos
 
 /// Remembers the last style the user applied, so the next photo (and batch
 /// mode) starts from it. The object selection is per photo and isn't kept.
@@ -37,6 +38,26 @@ enum FriendlyError {
             "Select at least one object to export."
         default:
             "Something went wrong while processing this photo. Please try again."
+        }
+    }
+}
+
+/// Adds rendered files to the user's photo library.
+///
+/// `nonisolated` on purpose: Photos runs the change block on its own queue.
+/// Written inside a `MainActor` view or model, the closure would inherit that
+/// isolation, and Swift's runtime check traps when Photos calls it off the
+/// main thread.
+nonisolated enum PhotoLibrary {
+    static func requestAddAccess() async -> Bool {
+        await PHPhotoLibrary.requestAuthorization(for: .addOnly) == .authorized
+    }
+
+    static func save(_ urls: [URL]) async throws {
+        try await PHPhotoLibrary.shared().performChanges {
+            for url in urls {
+                PHAssetCreationRequest.forAsset().addResource(with: .photo, fileURL: url, options: nil)
+            }
         }
     }
 }

@@ -1,5 +1,4 @@
 import CleanCutKit
-import Photos
 import PhotosUI
 import SwiftUI
 
@@ -166,14 +165,10 @@ final class BatchModel {
     func saveAll() async -> Bool {
         let files = outputFiles
         guard !files.isEmpty,
-              await PHPhotoLibrary.requestAuthorization(for: .addOnly) == .authorized
+              await PhotoLibrary.requestAddAccess()
         else { return false }
         do {
-            try await PHPhotoLibrary.shared().performChanges {
-                for url in files {
-                    PHAssetCreationRequest.forAsset().addResource(with: .photo, fileURL: url, options: nil)
-                }
-            }
+            try await PhotoLibrary.save(files)
             savedCount = files.count
             return true
         } catch {
