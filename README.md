@@ -121,6 +121,16 @@ Models/                  U2Netp.mlpackage (+ generated ISNet variants, git-ignor
 docs/                    SPEC, ARCHITECTURE, DECISIONS, BENCHMARKS
 ```
 
+## How I built this
+
+I built CleanCut with [Claude Code](https://claude.com/claude-code) as a pair programmer, and most commits carry its `Co-Authored-By` trailer. I set the product scope, the architecture and the trade-offs, and reviewed each plan before any code was written. Claude wrote most of the code, tests and first drafts of the docs, and ran the tools. [`CLAUDE.md`](CLAUDE.md) and the [`/feature`](.claude/skills/feature/SKILL.md) and [`/bugfix`](.claude/skills/bugfix/SKILL.md) skills are that working agreement, kept in the repo on purpose: conventions, commands, and the "hard-won gotchas", each one a real bug I don't want back.
+
+Nothing went in on the AI's word:
+- **Tests.** 98 Swift Testing tests run on every change, and CI treats warnings as errors. The properties that matter are tests rather than claims: preview/export parity, Amazon's exact white, and the edge kernel's error reduction. Bugs are fixed test-first.
+- **Benchmarks.** Every number in these docs comes from a harness in the repo (`cleancut-bench` on the Mac, Settings › Benchmarks on an iPhone), with the raw data in [`docs/benchmarks`](docs/benchmarks).
+- **Decision records.** Each non-obvious choice is written down with its cost in [DECISIONS.md](docs/DECISIONS.md), backed by a measurement where there is one.
+- **Screenshots.** A UI flow test exports screenshots (`make screenshots`), and I looked at them after every UI change.
+
 ## What I'd do next
 
 - **More chips.** Run Settings › Benchmarks on a recent iPhone (A17/A18) next to the A13, and cut the worst-case preview frame on older phones (a lower-resolution matte while a slider moves).
