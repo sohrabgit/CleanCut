@@ -59,6 +59,20 @@ struct CoreMLSegmenterTests {
         #expect(bitmap[Int(left.subject.midX), Int(size.height - left.subject.midY)].r < 10)
         #expect(bitmap[Int(right.subject.midX), Int(size.height - right.subject.midY)].r > 200)
     }
+
+    /// Guided capture's live mask finds the replay camera's bottle, so the
+    /// Simulator exercises the same path as a device.
+    @Test func liveMaskFindsTheReplayProduct() async throws {
+        let scene = ReplayScene(size: CGSize(width: 540, height: 720))
+        let frame = scene.frame(.good).transformed(by: CGAffineTransform(translationX: 10, y: 20))
+        let mask = try await makeSegmenter().liveMask(for: frame)
+        #expect(mask.extent == frame.extent)
+
+        let truth = try LabelMap(masks: [scene.mask(.good)], imageSize: scene.size, renderer: renderer)
+        let live = try LabelMap(masks: [mask.transformed(by: CGAffineTransform(translationX: -10, y: -20))], imageSize: scene.size, renderer: renderer)
+        let iou = SegmentationBenchmark.foregroundIoU(live, truth)
+        #expect(iou > 0.8, "IoU \(iou)")
+    }
 }
 
 @Suite("FallbackSegmenter")

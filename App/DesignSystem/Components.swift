@@ -138,3 +138,29 @@ struct SectionLabel: View {
             .accessibilityAddTraits(.isHeader)
     }
 }
+
+/// A short hint floating over a photo, on a material capsule.
+struct HintCapsule: View {
+    let systemImage: String
+    let text: String
+    var onDismiss: (() -> Void)?
+
+    var body: some View {
+        HStack(spacing: Tokens.Spacing.xs) {
+            Image(systemName: systemImage)
+            Text(text)
+            if let onDismiss {
+                Button("Dismiss", systemImage: "xmark", action: onDismiss)
+                    .labelStyle(.iconOnly)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .font(.footnote.weight(.medium))
+        .padding(.horizontal, Tokens.Spacing.m)
+        .padding(.vertical, Tokens.Spacing.xs + 2)
+        .background(.regularMaterial, in: Capsule())
+        .padding(.bottom, Tokens.Spacing.s)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+}

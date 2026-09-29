@@ -5,7 +5,11 @@
 [![CI](https://github.com/sohrabgit/CleanCut/actions/workflows/ci.yml/badge.svg)](https://github.com/sohrabgit/CleanCut/actions/workflows/ci.yml)
 ![Swift 6](https://img.shields.io/badge/Swift-6-orange) ![iOS 18+](https://img.shields.io/badge/iOS-18%2B-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)
 
-<!-- DEMO: docs/media/demo.gif is recorded with `make demo` (see "Recording the demo"). -->
+<p align="center">
+  <img src="docs/media/demo.gif" width="300" alt="Guided capture coaching a product shot (move closer, step back, more light, hold still, glare, then ready), followed by the editor's cutout, backgrounds, shadows, formats and export sheet">
+</p>
+
+<!-- Recorded in the iPhone Simulator with `make demo`; guided capture runs on its replay camera there. -->
 
 ## What this demonstrates
 
@@ -14,13 +18,15 @@
 | **Core Image** | A pure pipeline `Pipeline.makeImage(inputs, recipe, size) → CIImage`: framing in output space, feathering, drop and contact shadows built from the mask, studio backdrops. Tests prove the preview and the export match. → [`Pipeline/`](Kit/CleanCutKit/Pipeline) |
 | **Metal** | A custom `CIColorKernel` that removes backdrop color from soft edges by solving the compositing equation. The live preview is an `MTKView` drawn through a Metal-backed `CIContext`, measured at ≤ 5 ms per 1206² frame in the worst case (60 Hz budget: 16.7 ms). → [`EdgeDecontamination.metal`](Kit/CleanCutKit/Kernels/EdgeDecontamination.metal), [`CanvasView.swift`](App/Features/Editor/CanvasView.swift) |
 | **Vision & Core ML** | Vision foreground *instance* masks with tap-to-select. Open-source models (U²-Netp, ISNet; Apache-2.0) are converted reproducibly and benchmarked across CPU / GPU / Neural Engine. → [BENCHMARKS.md](docs/BENCHMARKS.md) |
-| **Swift concurrency** | Swift 6 strict concurrency with warnings as errors. The app is `MainActor` by default and heavy work runs `@concurrent`. Batch mode is a bounded sliding-window `TaskGroup` streaming progress as an `AsyncStream`. → [`BatchProcessor.swift`](Kit/CleanCutKit/Batch/BatchProcessor.swift) |
+| **Swift concurrency** | Swift 6 strict concurrency with warnings as errors. The app is `MainActor` by default and heavy work runs `@concurrent`. Batch mode is a bounded sliding-window `TaskGroup` streaming progress as an `AsyncStream`. The camera is an actor on its own capture queue. → [`BatchProcessor.swift`](Kit/CleanCutKit/Batch/BatchProcessor.swift), [`CameraEngine.swift`](App/Features/Capture/CameraEngine.swift) |
+| **AVFoundation & real-time analysis** | Guided capture checks every frame before the shutter: two custom Core Image kernels (a Laplacian for sharpness, a tone pass for clipping and glare) weighted by a live U²-Netp subject mask, reduced on the GPU to eight floats per frame, with a coach that holds each verdict before changing a tip. A generated replay scene stands in for the camera in the Simulator, and tests stage every tip through the real analyzer. → [`Capture/`](Kit/CleanCutKit/Capture), [DECISIONS 010](docs/DECISIONS.md) |
 | **Performance work** | I measured and fixed batch memory: a long-lived `CIContext` peaked at 2.9 GB, a context per photo stays flat at ~0.9 GB. ImageIO downsamples during decode, and the preview runs on cached proxies. → [DECISIONS 006](docs/DECISIONS.md) |
 | **Product & UX** | A clean, native UI: the photo is the hero and there's one primary action per screen. Every change is live and can be undone. Haptics, VoiceOver, Dynamic Type, Dark Mode, and an iPad/Mac inspector layout. → [SPEC.md](docs/SPEC.md#uiux) |
-| **Testing** | 61 Swift Testing tests that run natively on macOS in ~3 s and on the iOS Simulator, a UI flow test that exports screenshots, and CI. |
+| **Testing** | 91 Swift Testing tests that run natively on macOS in ~3 s and on the iOS Simulator, a UI flow test that exports screenshots, and CI. |
 
 ## Features
 
+- **Guided capture.** Take Photo opens a camera that coaches before you shoot: it finds the product and checks that it's whole and big enough in the frame, lit without blown highlights, sharp, and free of glare. One tip at a time, and a shutter ring that turns teal when the shot is ready. It never blocks the shutter.
 - **Remove the background.** Vision finds each object. Tap an object to include or exclude it, and a near miss still snaps to the nearest one. U²-Netp (Core ML) is the fallback where Vision can't run; its mask is split into separate objects, so tapping still works.
 - **Studio look.** White, paper, sand and other swatches, a studio sweep, a custom color, or transparent. Shadows are None / Soft / Contact / Natural, with intensity, direction, distance and softness.
 - **Clean edges.** A custom Metal kernel removes the old background's color from hair-thin edges (a green halo from a lawn, a warm fringe from a table).
@@ -93,8 +99,8 @@ open CleanCut.xcodeproj
 ## Project layout
 
 ```
-App/                     SwiftUI app: Home, Editor (canvas, tools), Export, Batch, Settings, DesignSystem
-Kit/CleanCutKit/         Recipe, Pipeline, Kernels (Metal), Segmentation, Rendering, Batch, Bench
+App/                     SwiftUI app: Home, Capture, Editor (canvas, tools), Export, Batch, Settings, DesignSystem
+Kit/CleanCutKit/         Recipe, Pipeline, Kernels (Metal), Capture, Segmentation, Rendering, Batch, Bench
 Tests/CleanCutKitTests/  Swift Testing suite (+ synthetic scenes)
 UITests/                 End-to-end flow, screenshots, demo recording
 Tools/bench/             macOS CLI: render, sample, batch, segment, memprobe
@@ -108,6 +114,7 @@ docs/                    SPEC, ARCHITECTURE, DECISIONS, BENCHMARKS
 - **iPhone numbers.** Add an in-app "Lab" screen on top of `SegmentationBenchmark`, and publish a benchmark table per chip.
 - **Prewarm the model.** Load the Core ML model in the background on first launch to absorb the one-time Neural Engine compile.
 - **Better matting.** Guided-filter refinement of the Core ML masks (they're upsampled from 320²), and a multi-level foreground estimate for the edge kernel.
+- **Tune guided capture on real photos.** Measure its per-frame cost on an iPhone, and calibrate the thresholds on a labeled set of real product shots instead of generated scenes.
 - **Fidelity check.** OCR before and after to flag product labels the mask clipped.
 - **Templates.** Share `Recipe` JSON between sellers ("shop style").
 

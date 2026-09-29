@@ -38,12 +38,18 @@ struct SamplePhoto: Identifiable, Hashable {
 /// Samples live in `App/Resources/Samples` as `<name>.jpg` plus
 /// `<name>.masks/<instance>.png`.
 enum SampleLibrary {
+    /// Local dev samples (`local-*`, git-ignored) may be third-party images,
+    /// so recordings that get committed (the demo GIF) launch with
+    /// `-hideLocalSamples` to leave them out.
+    private static let hidesLocalSamples = ProcessInfo.processInfo.arguments.contains("-hideLocalSamples")
+
     static let all: [SamplePhoto] = {
         guard let root = Bundle.main.url(forResource: "Samples", withExtension: nil),
               let files = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
         else { return [] }
         return files
             .filter { ["jpg", "jpeg", "heic", "png"].contains($0.pathExtension.lowercased()) }
+            .filter { !hidesLocalSamples || !$0.lastPathComponent.hasPrefix("local-") }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
             .map { url in
                 let name = url.deletingPathExtension().lastPathComponent

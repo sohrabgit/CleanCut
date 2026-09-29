@@ -23,5 +23,6 @@ TEST_RUNNER_CLEANCUT_DEMO=1 xcodebuild test-without-building -project CleanCut.x
 kill -INT "$RECORDER"
 wait "$RECORDER" 2>/dev/null || true
 
-# Trim the app-launch and teardown seconds; tune with START/END if needed.
-swift Tools/scripts/mp4-to-gif.swift "$VIDEO" "$OUT" --width "${WIDTH:-360}" --fps "${FPS:-12}" --start "${START:-4}" --end "${END:-33}"
+# Trim the Simulator's home screen before launch and the teardown after the
+# export sheet; tune with START/END if needed.
+swift Tools/scripts/mp4-to-gif.swift "$VIDEO" "$OUT" --width "${WIDTH:-360}" --fps "${FPS:-12}" --start "${START:-4.7}" --end "${END:-43.5}"

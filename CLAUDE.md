@@ -2,7 +2,7 @@
 
 CleanCut is an on-device product-photo studio for iOS 18+: Vision/Core ML segmentation, a Core Image pipeline with a custom Metal kernel, studio compositing and marketplace export. It's a portfolio project for a Photoroom Senior iOS application. Code quality, a polished UI and honest docs all matter.
 
-Read [README.md](README.md) for the overview. The deeper docs are [docs/SPEC.md](docs/SPEC.md) (product + UI/UX), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DECISIONS.md](docs/DECISIONS.md) (ADRs 001–008) and [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+Read [README.md](README.md) for the overview. The deeper docs are [docs/SPEC.md](docs/SPEC.md) (product + UI/UX), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DECISIONS.md](docs/DECISIONS.md) (ADRs 001–010) and [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Workflows
 - **New feature or change:** use the `/feature` skill.
@@ -30,7 +30,7 @@ Read [README.md](README.md) for the overview. The deeper docs are [docs/SPEC.md]
 `Tools/scripts/xcfilter.sh` condenses xcodebuild output. With `set -o pipefail`, failures still fail.
 
 ## Layout
-- `Kit/CleanCutKit/` is a **non-isolated, UI-free framework** (iOS + macOS): Recipe, Pipeline, Kernels (Metal), Segmentation, Rendering, Batch, Bench. Anything testable goes here.
+- `Kit/CleanCutKit/` is a **non-isolated, UI-free framework** (iOS + macOS): Recipe, Pipeline, Kernels (Metal), Capture, Segmentation, Rendering, Batch, Bench. Anything testable goes here.
 - `App/` is SwiftUI, **`MainActor` by default** (`SWIFT_DEFAULT_ACTOR_ISOLATION`). Use `@concurrent` for heavy async work (decoding, rendering).
 - `Tests/CleanCutKitTests/` uses Swift Testing, with `Support/TestEnvironment.swift` (`SyntheticScene`, PSNR, bitmap helpers).
 - `UITests/` holds XCTest UI flows: `EditorFlowTests` (screenshots) and `DemoRecordingTests` (GIF).

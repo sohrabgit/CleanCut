@@ -10,6 +10,8 @@ flowchart LR
     subgraph App["CleanCut app (SwiftUI, MainActor)"]
         Home --> Editor
         Home --> Batch
+        Home --> Capture["Guided capture<br/>CameraEngine / ReplayFeed"]
+        Capture --> Editor
         Editor --> Canvas["CanvasView<br/>MTKView + PreviewRenderer"]
         Editor --> Export["Export sheet"]
         Batch["Batch view + model"]
@@ -28,6 +30,7 @@ flowchart LR
         Exporter
         BatchP["BatchProcessor<br/>bounded TaskGroup"]
         Bench["SegmentationBenchmark"]
+        Analyzer["FrameAnalyzer + CaptureCoach<br/>CIKernels + CIAreaAverage"]
     end
 
     Seg --- Vision & CoreML & Masks
@@ -41,6 +44,8 @@ flowchart LR
     Exporter --> Render
     Loader --> Prepared
     Bench --> Seg
+    Capture --> Analyzer
+    Capture --> CoreML
     CLI["cleancut-bench (macOS)"] --> Bench & BatchP & Exporter
 ```
 
@@ -77,6 +82,17 @@ flowchart LR
 - Zooming re-renders the pipeline at the magnified size, and Core Image only evaluates what lands in the drawable. Tap-to-select hit-tests with the same `CanvasLayout` math the renderer uses.
 - `OSSignposter` intervals and a debug HUD (GPU/CPU ms per frame) are on the canvas.
 
+## Guided capture
+
+The camera coaches before the shutter. Frames flow one way and are dropped, never queued:
+
+1. **Feed.** `CameraEngine` (AVFoundation) or `ReplayFeed` (the Simulator and UI tests, filming the Kit's generated `ReplayScene`) yields upright `CIImage`s, at most 15 per second, through a newest-only `AsyncStream`. A slow consumer drops frames instead of holding camera buffers.
+2. **Mask.** Every third frame, `CoreMLSegmenter.liveMask` renders the frame into a pooled 320² buffer inside the model's actor and returns U²-Netp's mask. It skips the label map and object splitting.
+3. **Measure.** `FrameAnalyzer` resamples the frame to a 720-px short side and runs two kernels from `CaptureKernels.metal`: a Laplacian for detail and a tone pass for clipped highlights, crushed shadows and specular hotspots. Both are weighted by the mask and reduced with `CIAreaAverage`, then read back as eight floats. The mask's bounding box comes from a ≤128-px readback.
+4. **Judge.** `CaptureAssessment` maps the metrics to at most one issue per check (framing, light, sharpness, glare). `CaptureCoach` holds each check for 0.4 s before changing it and picks the tip by check order.
+
+Everything after the feed is shared, and the Kit tests stage every scenario through the real analyzer. See [DECISIONS 010](DECISIONS.md) for the trade-offs.
+
 ## Segmentation
 
 `Segmenter` → `SegmentationResult`: a low-res `LabelMap` (for hit-testing and bounding boxes, pure and unit-tested) plus a closure that builds a full-resolution soft mask for any selection.
@@ -93,6 +109,7 @@ flowchart LR
 - **Swift 6** language mode with warnings as errors.
 - The app uses `MainActor` by default. Heavy work is marked `@concurrent` (decode, thumbnails, export rendering) or lives in the Kit.
 - `CIContext`, `CIImage`, `MTLDevice` and Vision's observations are `Sendable`. `MLModel` isn't, so `CoreMLSegmenter` keeps it inside an actor.
+- `CameraEngine` is an actor whose executor is its own `DispatchSerialQueue`, the queue the video output delivers on. Session configuration and `startRunning()` block, and would otherwise tie up a thread of the cooperative pool. `AVCaptureSession` isn't `Sendable`; the preview layer is its only use outside the actor (`PreviewSession`).
 - `BatchProcessor` uses a sliding window over a task group: at most N photos in flight. Progress arrives as an `AsyncStream`, and dropping the stream cancels the work.
 
 ## Memory

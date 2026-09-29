@@ -44,7 +44,7 @@ enum Segmenters {
     }
 
     /// Fastest configuration in docs/BENCHMARKS.md: CPU + Neural Engine.
-    static func u2netp(renderer: RenderService) throws -> CoreMLSegmenter {
+    nonisolated static func u2netp(renderer: RenderService) throws -> CoreMLSegmenter {
         guard let url = Bundle.main.url(forResource: "U2Netp", withExtension: "mlmodelc") else {
             throw SegmentationError.unavailable("U²-Netp model missing from the app bundle")
         }

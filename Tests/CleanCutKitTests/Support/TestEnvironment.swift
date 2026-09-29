@@ -30,19 +30,23 @@ struct SyntheticScene {
     let foreground: RGBA
     let backdrop: RGBA
     let edgeSoftness: CGFloat
+    /// Checker square size for a textured product (fine detail); `nil` is plain.
+    let texture: CGFloat?
 
     init(
         size: CGSize = CGSize(width: 400, height: 300),
         subject: CGRect = CGRect(x: 150, y: 90, width: 100, height: 130),
         foreground: RGBA = RGBA(hex: 0xC8321E),
         backdrop: RGBA = RGBA(hex: 0x2FA84F),
-        edgeSoftness: CGFloat = 2
+        edgeSoftness: CGFloat = 2,
+        texture: CGFloat? = nil
     ) {
         self.size = size
         self.subject = subject
         self.foreground = foreground
         self.backdrop = backdrop
         self.edgeSoftness = edgeSoftness
+        self.texture = texture
     }
 
     var extent: CGRect { CGRect(origin: .zero, size: size) }
@@ -56,7 +60,15 @@ struct SyntheticScene {
     }
 
     var source: CIImage {
-        CIImage(color: foreground.ciColor)
+        var product = CIImage(color: foreground.ciColor)
+        if let texture {
+            product = CIFilter(name: "CICheckerboardGenerator", parameters: [
+                "inputColor0": foreground.ciColor,
+                "inputColor1": foreground.adjustingBrightness(-0.5).ciColor,
+                "inputWidth": texture,
+            ])!.outputImage!
+        }
+        return product
             .applyingFilter("CIBlendWithRedMask", parameters: [
                 kCIInputBackgroundImageKey: CIImage(color: backdrop.ciColor),
                 kCIInputMaskImageKey: mask,
@@ -75,7 +87,8 @@ struct SyntheticScene {
             subject: subject.applying(CGAffineTransform(scaleX: factor, y: factor)),
             foreground: foreground,
             backdrop: backdrop,
-            edgeSoftness: edgeSoftness * factor
+            edgeSoftness: edgeSoftness * factor,
+            texture: texture.map { $0 * factor }
         )
     }
 }

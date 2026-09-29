@@ -16,7 +16,8 @@ OCR fidelity checks, generative backgrounds, manual brush mask editing, accounts
 
 | Area | Behaviour |
 |---|---|
-| Import | Photos picker (single & multi), camera (device only), bundled sample photos, drag & drop (iPad/Mac) |
+| Import | Photos picker (single & multi), guided capture camera, bundled sample photos |
+| Guided capture | A live camera that checks every frame before the shutter: **framing** (the product is found, whole, and big enough), **light** (not too dim, no blown highlights), **sharpness** and **glare**. One tip at a time, a four-item checklist, and a shutter ring that turns accent (with a haptic) when all pass. It advises and never blocks. In the Simulator a staged scene plays instead of a camera |
 | Segmentation | Vision foreground *instance* mask. Every detected object starts selected; **tap an object to include or exclude it**. A tap on empty background picks the nearest object within a small radius. Where Vision can't run (the Simulator), U²-Netp (Core ML) takes over automatically; its single mask is split into separate objects, so tap-to-select still works for products that don't touch |
 | Compositing | Feathered edges, **edge color decontamination (custom Metal CIKernel)**, drop and contact shadows built from the mask. Backgrounds: solid swatches, a custom color, a soft studio-sweep gradient, or transparent |
 | Preview | Live `MTKView` preview rendered by a Metal-backed `CIContext` on a proxy image (≤ 1600 px). It always shows the final framed output |
@@ -45,7 +46,14 @@ Defined in one table: [`ExportPreset.swift`](../Kit/CleanCutKit/Recipe/ExportPre
 
 ### Screens
 1. **Home**: one large "Add product photo" card (Photos / Camera), a quieter "Batch edit" button, and a row of samples to try. One line explains what the app does.
-2. **Editor**
+2. **Guided capture** (Take Photo)
+   - A 4:3 viewfinder (what you see is what the photo contains) with corner brackets around the detected product, accent when it's well framed.
+   - One tip over the viewfinder, e.g. "Hold still, the photo is blurry", changing only once a new state has held for 0.4 s.
+   - A checklist under it: In frame · Light · Sharp · No glare, each with a symbol and text (never color alone).
+   - The shutter always works. When everything passes, its ring turns accent with a success haptic, and the tip reads "Looks great, take the photo".
+   - VoiceOver announces tip changes (at most one every 2 s), and the shutter's value is the current tip. With Reduce Motion, brackets and tips don't animate and there's no capture flash.
+   - If camera access is off, the screen explains why and links to Settings.
+3. **Editor**
    - Top bar: Close · Undo / Redo · **Compare** (press and hold to see the original) · **Export** (the primary action).
    - Canvas: the final framed output in the chosen format's aspect ratio. Pinch to zoom and inspect edges, drag to pan, double-tap to fit.
    - Format chips above the tools: `1:1 Depop · 4:5 Vinted · Amazon · PNG`.
@@ -56,9 +64,9 @@ Defined in one table: [`ExportPreset.swift`](../Kit/CleanCutKit/Recipe/ExportPre
      - **Edges**: Clean edges on/off plus strength. Adjust: feather.
    - While Vision runs, a scan shimmer plays over the photo. Then the cutout "lifts" onto the studio background with a spring (skipped when Reduce Motion is on).
    - On iPad and Mac (regular width), the tools move into a right-hand inspector.
-3. **Export sheet**: a card per preset with a live thumbnail and the exact pixel size. Pick several, then **Save to Photos** or Share; a checkmark and a success haptic confirm.
-4. **Batch**: pick photos, confirm the style and formats, then watch the grid fill in (a progress ring per tile, Cancel, Retry on failed tiles). Finish with "Save all" or Share.
-5. **Settings**: segmentation engine (Vision / U²-Net, experimental), a debug HUD (frame time), licenses.
+4. **Export sheet**: a card per preset with a live thumbnail and the exact pixel size. Pick several, then **Save to Photos** or Share; a checkmark and a success haptic confirm.
+5. **Batch**: pick photos, confirm the style and formats, then watch the grid fill in (a progress ring per tile, Cancel, Retry on failed tiles). Finish with "Save all" or Share.
+6. **Settings**: segmentation engine (Vision / U²-Net, experimental), a debug HUD (frame time), licenses.
 
 Error messages are written for people, e.g. "No product found — try a photo with a clear subject", never raw error text.
 
@@ -67,4 +75,5 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the component view and [DECISIONS.md]
 
 - **Pure pipeline:** `Pipeline.makeImage(inputs, recipe, outputSize) -> CIImage`. A `Recipe` is a `Codable`, `Hashable`, `Sendable` value, and all its lengths are relative. The preview and the export call the same function at different output sizes.
 - **Swift 6 strict concurrency** with warnings treated as errors. The app target defaults to `MainActor` isolation; the `CleanCutKit` framework is non-isolated and `Sendable`.
+- **Guided capture:** per-frame GPU statistics (two Core Image kernels reduced with `CIAreaAverage`) weighted by a U²-Netp mask, and a coach with hysteresis. See [ARCHITECTURE.md](ARCHITECTURE.md#guided-capture) and [DECISIONS 010](DECISIONS.md).
 - **Targets:** iOS 18+ app; `CleanCutKit` builds for iOS 18 and macOS 15, so tests and benchmarks run natively on a Mac.

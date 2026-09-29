@@ -20,7 +20,7 @@ struct HomeView: View {
                     AddPhotoCard(
                         pickerItem: $pickerItem,
                         isLoading: isLoadingPick,
-                        onCamera: CameraPicker.isAvailable ? { isShowingCamera = true } : nil
+                        onCamera: CaptureModel.isAvailable ? { isShowingCamera = true } : nil
                     )
                     if !samples.isEmpty { sampleRow }
                     batchRow
@@ -47,14 +47,12 @@ struct HomeView: View {
             EditorView(source: source)
         }
         .fullScreenCover(isPresented: $isShowingCamera) {
-            CameraPicker { image in
-                guard let data = image.jpegData(compressionQuality: 0.95) else { return }
+            CaptureView { data in
                 Task {
                     await waitForPresentationsToSettle()
                     editorSource = .data(data)
                 }
             }
-            .ignoresSafeArea()
         }
         .fullScreenCover(isPresented: $isShowingBatch) {
             BatchView()
@@ -141,7 +139,7 @@ struct HomeView: View {
         }
     }
 
-    /// A full-screen cover presented while the Photos picker or camera is still
+    /// A full-screen cover presented while the Photos picker or capture is still
     /// animating away gets zero safe-area insets, so the editor's top bar lands
     /// under the status bar and its tool tabs under the home indicator. Loading
     /// a local photo usually beats that animation, so wait for UIKit to finish
